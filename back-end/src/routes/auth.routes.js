@@ -1,0 +1,21 @@
+const router=require('express').Router();
+const c=require('../controllers/auth.controllers');
+const validate=require('../middlewares/auth-validation.middleware');
+const auth=require('../middlewares/auth.middleware');
+const rateLimit=require('../middlewares/rate-limit.middleware');
+// Do not trust arbitrary X-Forwarded-For; app keeps Express trust proxy disabled.
+const overall=rateLimit({limit:120,windowMs:15*60*1000});
+const emails=rateLimit({limit:10,windowMs:10*60*1000});
+const attempts=rateLimit({limit:30,windowMs:15*60*1000});
+router.use((req,res,next)=>{res.setHeader('Cache-Control','no-store');next();},overall);
+router.post('/register',emails,validate('register'),c.register);
+router.post('/resend-verification',emails,validate('resend'),c.resend);
+router.post('/verify-email',attempts,validate('verify'),c.verifyEmail);
+router.post('/login',attempts,validate('login'),c.login);
+router.post('/forgot-password',emails,validate('forgot'),c.forgot);
+router.post('/verify-reset-code',attempts,validate('verify'),c.verifyReset);
+router.post('/reset-password',attempts,validate('reset'),c.reset);
+router.get('/me',auth,c.me);
+router.post('/change-password',attempts,auth,validate('change'),c.change);
+router.post('/logout',auth,c.logout);
+module.exports=router;
