@@ -2,12 +2,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../configs/database.config');
 const transporter = require('../configs/mailer.config');
-const { getOtpEmailTemplate } = require('../utils/mail.util');
+const { getOtpEmailTemplate, getVerifyEmailTemplate } = require('../utils/mail.util');
 
 const registerUser = async (data) => {
     const { full_name, email, password, phone } = data;
 
-    // 1. Kiểm tra xem email hoặc sđt đã tồn tại chưa
     const [existingUsers] = await db.execute(
         'SELECT id FROM users WHERE email = ? OR phone = ?',
         [email, phone]
@@ -17,24 +16,33 @@ const registerUser = async (data) => {
         throw new Error('USER_ALREADY_EXISTS');
     }
 
-    // 2. Lấy role_id mặc định cho người dùng đăng ký mới (CUSTOMER)
     const [roles] = await db.execute('SELECT id FROM roles WHERE code = ?', ['CUSTOMER']);
-    if (roles.length === 0) {
-        throw new Error('ROLE_NOT_FOUND'); // Đề phòng DB chưa được seed data
-    }
+    if (roles.length === 0) throw new Error('ROLE_NOT_FOUND');
     const roleId = roles[0].id;
 
-    // 3. Mã hóa mật khẩu
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 4. Thực hiện insert user mới vào DB (Cột password_hash)
+    // Sinh mã OTP xác minh email 6 số
+    const verifyToken = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Insert user với trạng thái PENDING, lưu mã OTP và set hạn 10 phút bằng hàm của MySQL
     const [result] = await db.execute(
-        'INSERT INTO users (role_id, full_name, email, password_hash, phone, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [roleId, full_name, email, hashedPassword, phone, 'ACTIVE']
+        `INSERT INTO users 
+        (role_id, full_name, email, password_hash, phone, status, email_verify_token, email_verify_expires) 
+        VALUES (?, ?, ?, ?, ?, 'PENDING', ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+        [roleId, full_name, email, hashedPassword, phone, verifyToken]
     );
 
-    // 5. Lấy thông tin user vừa tạo để trả về (JOIN với bảng roles)
+    // Gửi email xác minh ngay sau khi lưu DB
+    const mailOptions = {
+        from: `"AgriFood Smart" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: 'Xác minh tài khoản - AgriFood Smart',
+        html: getVerifyEmailTemplate(verifyToken)
+    };
+    await transporter.sendMail(mailOptions);
+
     const [newUsers] = await db.execute(
         `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role_code, u.status, u.created_at 
          FROM users u JOIN roles r ON u.role_id = r.id 
@@ -43,6 +51,35 @@ const registerUser = async (data) => {
     );
 
     return newUsers[0];
+};
+
+const verifyEmailAccount = async (email, otp) => {
+    const [users] = await db.execute(
+        'SELECT id, status, email_verify_token, email_verify_expires, NOW() as current_db_time FROM users WHERE email = ?',
+        [email]
+    );
+
+    if (users.length === 0) throw new Error('USER_NOT_FOUND');
+
+    const user = users[0];
+
+    if (user.status === 'ACTIVE') throw new Error('ALREADY_VERIFIED');
+    if (!user.email_verify_token || user.email_verify_token !== otp) throw new Error('INVALID_OTP');
+
+    const now = new Date(user.current_db_time);
+    const expiresAt = new Date(user.email_verify_expires);
+
+    if (now > expiresAt) throw new Error('OTP_EXPIRED');
+
+    // Cập nhật trạng thái thành ACTIVE, ghi nhận thời gian xác minh và xóa token
+    await db.execute(
+        `UPDATE users 
+         SET status = 'ACTIVE', email_verified_at = NOW(), email_verify_token = NULL, email_verify_expires = NULL 
+         WHERE email = ?`,
+        [email]
+    );
+
+    return true;
 };
 
 const loginUser = async (email, password) => {
@@ -54,16 +91,13 @@ const loginUser = async (email, password) => {
         [email]
     );
 
-    if (users.length === 0) {
-        throw new Error('INVALID_CREDENTIALS');
-    }
+    if (users.length === 0) throw new Error('INVALID_CREDENTIALS');
 
     const user = users[0];
 
-    // Kiểm tra tài khoản có bị khóa không
-    if (user.status === 'LOCKED') {
-        throw new Error('ACCOUNT_LOCKED');
-    }
+    // Kiểm tra tài khoản có bị khóa hay chưa active không
+    if (user.status === 'LOCKED') throw new Error('ACCOUNT_LOCKED');
+    if (user.status === 'PENDING') throw new Error('ACCOUNT_UNVERIFIED');
 
     // 2. So sánh mật khẩu (Đổi thành password_hash)
     const isMatch = await bcrypt.compare(password, user.password_hash);
@@ -153,5 +187,6 @@ module.exports = {
     loginUser,
     requestPasswordReset,
     verifyResetOtp,
-    resetPassword
+    resetPassword,
+    verifyEmailAccount
 };

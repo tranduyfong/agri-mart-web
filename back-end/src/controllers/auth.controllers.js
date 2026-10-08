@@ -23,6 +23,26 @@ const register = async (req, res) => {
     }
 };
 
+const verifyEmail = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        if (!email || !otp) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Email và mã xác minh là bắt buộc', 400);
+        }
+
+        await authService.verifyEmailAccount(email, otp);
+
+        return successResponse(res, null, null, 'Xác minh tài khoản thành công! Bạn có thể đăng nhập.', 200);
+    } catch (error) {
+        if (error.message === 'USER_NOT_FOUND') return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Tài khoản không tồn tại', 404);
+        if (error.message === 'ALREADY_VERIFIED') return errorResponse(res, 'VALIDATION_FAILED', 'Tài khoản đã được xác minh trước đó', 400);
+        if (error.message === 'INVALID_OTP') return errorResponse(res, 'VALIDATION_FAILED', 'Mã xác minh không chính xác', 400);
+        if (error.message === 'OTP_EXPIRED') return errorResponse(res, 'VALIDATION_FAILED', 'Mã xác minh đã hết hạn', 400);
+
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
+    }
+};
+
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -107,5 +127,5 @@ const resetPassword = async (req, res) => {
 };
 
 module.exports = {
-    register, login, forgotPassword, verifyOtpForgotPassword, resetPassword
+    register, login, forgotPassword, verifyOtpForgotPassword, resetPassword, verifyEmail
 };
