@@ -1,41 +1,57 @@
-const {
-    randomUUID
-} = require('node:crypto');
+const { v4: uuidv4 } = require('uuid');
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+dayjs.extend(utc);
 
-function envelope(res, code, message, data) {
-    const requestId = res.locals.requestId || randomUUID();
+/**
+ * Lấy thời gian server hiện tại theo chuẩn UTC (ISO-8601)
+ */
+const getServerTime = () => dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]');
 
-    res.locals.requestId = requestId;
-
-    res.setHeader('X-Request-Id', requestId);
-
-    return {
-        code,
-        message,
-        requestId,
-        serverTime: new Date().toISOString(),
-        data
+/**
+ * Trả về response thành công (có hoặc không có phân trang)
+ */
+const successResponse = (res, data, pagination = null, message = "Success", statusCode = 200) => {
+    const response = {
+        code: "SUCCESS",
+        message: message,
+        requestId: uuidv4(),
+        serverTime: getServerTime(),
+        data: data
     };
-}
 
-// Same call signature as the supplied backend.
-function successResponse(res, data, pagination = null, message = 'Success', statusCode = 200) {
-    const response = envelope(res, 'SUCCESS', message, data === undefined ? null : data);
-
+    // Nếu có thông tin phân trang thì thêm vào response
     if (pagination) {
-        for (const key of['pageNumber', 'pageSize', 'totalElements', 'totalPages']) {
-            response[key] = pagination[key];
-        }
+        response.pageNumber = pagination.pageNumber; // Bắt đầu từ 0
+        response.pageSize = pagination.pageSize;
+        response.totalElements = pagination.totalElements;
+        response.totalPages = pagination.totalPages;
     }
 
     return res.status(statusCode).json(response);
-}
+};
 
-function errorResponse(res, code, message, statusCode = 400, data = null) {
-    return res.status(statusCode).json(envelope(res, code, message, data));
-}
+/**
+ * Trả về response lỗi (Business Error, Validation, v.v.)
+ */
+const errorResponse = (res, code, message, statusCode = 400, data = null, debug = null) => {
+    const response = {
+        code: code,
+        message: message,
+        requestId: uuidv4(),
+        serverTime: getServerTime(),
+        data: data
+    };
+
+    // Chỉ đính kèm debug detail nếu môi trường không phải production
+    if (debug && process.env.NODE_ENV !== 'production') {
+        response.debug = debug;
+    }
+
+    return res.status(statusCode).json(response);
+};
 
 module.exports = {
     successResponse,
-    errorResponse
+    errorResponse,
 };

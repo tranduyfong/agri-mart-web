@@ -1,158 +1,111 @@
-const { getService } = require('../services/auth.services');
-const { successResponse } = require('../utils/response.util');
+const authService = require('../services/auth.services');
+const { successResponse, errorResponse } = require('../utils/response.util');
 
-const register = async (req, res, next) => {
+const register = async (req, res) => {
     try {
-        const result = await getService().register(req.input);
-        const message = req.locale === 'en'
-            ? 'Verification code sent.'
-            : 'Đã gửi mã xác minh qua email.';
+        const { full_name, email, password, phone } = req.body;
 
-        res.setHeader('Cache-Control', 'no-store');
+        if (!email || !password || !full_name) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Tên, Email và Password là bắt buộc', 400);
+        }
 
-        return successResponse(res, result, null, message, 201);
+        const result = await authService.registerUser({ full_name, email, password, phone });
+
+        return successResponse(res, result, null, 'Đăng ký tài khoản thành công', 201);
     } catch (error) {
-        next(error);
+        if (error.message === 'USER_ALREADY_EXISTS') {
+            return errorResponse(res, 'USER_ALREADY_EXISTS', 'Thông tin Email hoặc Số điện thoại đã tồn tại', 400);
+        }
+        if (error.message === 'ROLE_NOT_FOUND') {
+            return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Chưa khởi tạo quyền CUSTOMER trong hệ thống', 500);
+        }
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Something went wrong', 500, null, error.message);
     }
 };
 
-const resend = async (req, res, next) => {
+const login = async (req, res) => {
     try {
-        const result = await getService().requestCode(req.input.email, 'REGISTER');
-        const message = req.locale === 'en'
-            ? 'If the account is pending and eligible, an email will be sent.'
-            : 'Nếu tài khoản đang chờ xác minh và đủ điều kiện gửi lại, email sẽ được gửi.';
+        const { email, password } = req.body;
 
-        res.setHeader('Cache-Control', 'no-store');
+        const result = await authService.loginUser(email, password);
 
-        return successResponse(res, result, null, message, 200);
+        return successResponse(res, result, null, 'Đăng nhập thành công!', 200);
     } catch (error) {
-        next(error);
+        if (error.message === 'INVALID_CREDENTIALS') {
+            return errorResponse(res, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không đúng!', 400);
+        }
+        if (error.message === 'ACCOUNT_LOCKED') {
+            return errorResponse(res, 'ACCOUNT_LOCKED', 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin!', 403);
+        }
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
 };
 
-const verifyEmail = async (req, res, next) => {
+const forgotPassword = async (req, res) => {
     try {
-        const result = await getService().verify(req.input.email, req.input.code, 'REGISTER');
-        const message = req.locale === 'en'
-            ? 'Email verified. You can sign in.'
-            : 'Email đã được xác minh. Bạn có thể đăng nhập.';
+        const { email } = req.body;
+        if (!email) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Email là bắt buộc', 400);
+        }
 
-        res.setHeader('Cache-Control', 'no-store');
+        await authService.requestPasswordReset(email);
 
-        return successResponse(res, result, null, message, 200);
+        return successResponse(res, null, null, 'Mã OTP đã được gửi đến email của bạn');
     } catch (error) {
-        next(error);
+        if (error.message === 'USER_NOT_FOUND') {
+            return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Email không tồn tại trong hệ thống', 404);
+        }
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống khi gửi email', 500, null, error.message);
     }
 };
 
-const login = async (req, res, next) => {
+const verifyOtpForgotPassword = async (req, res) => {
     try {
-        const result = await getService().login(req.input.email, req.input.password);
-        const message = req.locale === 'en'
-            ? 'Signed in.'
-            : 'Đăng nhập thành công.';
+        const { email, otp } = req.body;
+        if (!email || !otp) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Email và OTP là bắt buộc', 400);
+        }
 
-        res.setHeader('Cache-Control', 'no-store');
+        await authService.verifyResetOtp(email, otp);
 
-        return successResponse(res, result, null, message, 200);
+        return successResponse(res, null, null, 'Xác thực OTP thành công');
     } catch (error) {
-        next(error);
+        if (error.message === 'USER_NOT_FOUND') {
+            return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Email không tồn tại trong hệ thống', 404);
+        }
+        if (error.message === 'INVALID_OTP') {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Mã OTP không chính xác', 400);
+        }
+        if (error.message === 'OTP_EXPIRED') {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Mã OTP đã hết hạn', 400);
+        }
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
 };
 
-const forgot = async (req, res, next) => {
+const resetPassword = async (req, res) => {
     try {
-        const result = await getService().requestCode(req.input.email, 'RESET_PASSWORD');
-        const message = req.locale === 'en'
-            ? 'If the account is eligible, a reset code will be sent.'
-            : 'Nếu email thuộc tài khoản hợp lệ và đủ điều kiện gửi lại, mã khôi phục sẽ được gửi.';
+        const { email, otp, newPassword } = req.body;
 
-        res.setHeader('Cache-Control', 'no-store');
+        if (!email || !otp || !newPassword) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Vui lòng cung cấp đầy đủ email, OTP và mật khẩu mới', 400);
+        }
 
-        return successResponse(res, result, null, message, 200);
+        if (newPassword.length < 6) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Mật khẩu mới phải có ít nhất 6 ký tự', 400);
+        }
+
+        await authService.resetPassword(email, otp, newPassword);
+
+        return successResponse(res, null, null, 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay bây giờ.');
     } catch (error) {
-        next(error);
+        if (error.message === 'USER_NOT_FOUND' || error.message === 'INVALID_OTP' || error.message === 'OTP_EXPIRED') {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Thông tin xác thực không hợp lệ hoặc đã hết hạn', 400);
+        }
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
-};
-
-const verifyReset = async (req, res, next) => {
-    try {
-        const result = await getService().verify(req.input.email, req.input.code, 'RESET_PASSWORD');
-        const message = req.locale === 'en'
-            ? 'Code verified. Set a new password within 10 minutes.'
-            : 'Mã hợp lệ. Hãy đặt mật khẩu mới trong 10 phút.';
-
-        res.setHeader('Cache-Control', 'no-store');
-
-        return successResponse(res, result, null, message, 200);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const reset = async (req, res, next) => {
-    try {
-        const result = await getService().reset(req.input.resetToken, req.input.newPassword);
-        const message = req.locale === 'en'
-            ? 'Password reset. Sign in again.'
-            : 'Đã đặt lại mật khẩu. Vui lòng đăng nhập lại.';
-
-        res.setHeader('Cache-Control', 'no-store');
-
-        return successResponse(res, result, null, message, 200);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const change = async (req, res, next) => {
-    try {
-        const result = await getService().changePassword(req.auth, req.input.currentPassword, req.input.newPassword);
-        const message = req.locale === 'en'
-            ? 'Password changed. All sessions revoked.'
-            : 'Đã đổi mật khẩu và thu hồi các phiên đăng nhập.';
-
-        res.setHeader('Cache-Control', 'no-store');
-
-        return successResponse(res, result, null, message, 200);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const logout = async (req, res, next) => {
-    try {
-        const result = await getService().logout(req.auth);
-        const message = req.locale === 'en'
-            ? 'Signed out on all devices.'
-            : 'Đã đăng xuất khỏi tất cả thiết bị.';
-
-        res.setHeader('Cache-Control', 'no-store');
-
-        return successResponse(res, result, null, message, 200);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const me = (req, res) => {
-    const message = req.locale === 'en' ? 'Account details.' : 'Thông tin tài khoản.';
-
-    res.setHeader('Cache-Control', 'no-store');
-
-    return successResponse(res, req.auth.user, null, message);
 };
 
 module.exports = {
-    register,
-    resend,
-    verifyEmail,
-    login,
-    forgot,
-    verifyReset,
-    reset,
-    change,
-    logout,
-    me
+    register, login, forgotPassword, verifyOtpForgotPassword, resetPassword
 };
