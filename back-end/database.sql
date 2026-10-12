@@ -259,3 +259,103 @@ ALTER TABLE `chat_rooms` ADD CONSTRAINT `fk_cr_staff` FOREIGN KEY (`assigned_sta
 ALTER TABLE `chat_messages` ADD CONSTRAINT `fk_cm_room` FOREIGN KEY (`room_id`) REFERENCES `chat_rooms`(`id`) ON DELETE CASCADE;
 ALTER TABLE `chat_message_attachments` ADD CONSTRAINT `fk_cma_message` FOREIGN KEY (`message_id`) REFERENCES `chat_messages`(`id`) ON DELETE CASCADE;
 ALTER TABLE `chat_message_attachments` ADD CONSTRAINT `fk_cma_file` FOREIGN KEY (`file_id`) REFERENCES `files`(`id`) ON DELETE CASCADE;
+
+-- CHỉnh sửa db
+ALTER TABLE `users` 
+ADD COLUMN `password_reset_token` VARCHAR(6) NULL AFTER `status`,
+ADD COLUMN `password_reset_expires` DATETIME NULL AFTER `password_reset_token`;
+
+INSERT INTO `roles` (`code`, `name`) VALUES 
+('ADMIN', 'Quản trị viên hệ thống'),
+('STAFF', 'Nhân viên cơ sở'),
+('CUSTOMER', 'Khách hàng');
+
+-- ==========================================
+-- VÁ LỖ HỔNG TỪ ẢNH REVIEW
+-- ==========================================
+
+-- 1. Xác minh email khi đăng ký
+ALTER TABLE `users`
+ADD COLUMN `email_verify_token` VARCHAR(6) NULL AFTER `status`,
+ADD COLUMN `email_verify_expires` DATETIME NULL AFTER `email_verify_token`,
+ADD COLUMN `email_verified_at` DATETIME NULL AFTER `email_verify_expires`;
+
+-- 2. Theo dõi thanh toán
+ALTER TABLE `orders`
+ADD COLUMN `payment_status` ENUM('UNPAID', 'PAID', 'REFUNDED') NOT NULL DEFAULT 'UNPAID' AFTER `payment_method`,
+ADD COLUMN `transaction_code` VARCHAR(120) NULL COMMENT 'Mã giao dịch từ VNPay/MoMo' AFTER `payment_status`;
+
+-- 3. Bán theo cân nặng & đơn vị tính
+ALTER TABLE `product_variants`
+ADD COLUMN `unit` VARCHAR(20) NOT NULL DEFAULT 'kg' COMMENT 'kg, gram, gói, hộp' AFTER `name`,
+ADD COLUMN `step_quantity` DECIMAL(14,3) NOT NULL DEFAULT 1 COMMENT 'Bước nhảy số lượng (VD: 0.5kg)' AFTER `unit`;
+
+-- 4. Quản lý lô hàng & Hạn sử dụng (Đặc thù Nông sản)
+-- Thêm mã lô và hạn sử dụng vào lúc nhập kho
+ALTER TABLE `goods_receipt_items`
+ADD COLUMN `batch_code` VARCHAR(50) NOT NULL COMMENT 'Mã lô hàng' AFTER `variant_id`,
+ADD COLUMN `manufactured_date` DATE NULL AFTER `unit_cost`,
+ADD COLUMN `expiry_date` DATE NOT NULL AFTER `manufactured_date`;
+
+-- Tách tồn kho theo từng Lô (thay vì gộp chung vào Variant)
+ALTER TABLE `branch_stock`
+ADD COLUMN `batch_code` VARCHAR(50) NOT NULL AFTER `variant_id`,
+ADD COLUMN `expiry_date` DATE NOT NULL AFTER `batch_code`,
+DROP INDEX `uk_branch_variant`, -- Xóa index cũ
+ADD UNIQUE KEY `uk_branch_variant_batch` (`branch_id`, `variant_id`, `batch_code`);
+
+-- 5. Xác định nhân viên gửi tin nhắn
+ALTER TABLE `chat_messages`
+ADD COLUMN `sender_id` BIGINT UNSIGNED NULL COMMENT 'ID của user/staff gửi tin, NULL nếu là AI' AFTER `sender_type`;
+
+ALTER TABLE `chat_messages` ADD CONSTRAINT `fk_cm_sender` FOREIGN KEY (`sender_id`) REFERENCES `users`(`id`) ON DELETE SET NULL;
+
+-- 6. Phân biệt loại Khuyến mãi & Flash Sale
+ALTER TABLE `promotions`
+ADD COLUMN `promotion_scope` ENUM('PRODUCT', 'SHIPPING') NOT NULL DEFAULT 'PRODUCT' AFTER `discount_type`,
+ADD COLUMN `is_flash_sale` BOOLEAN NOT NULL DEFAULT FALSE AFTER `promotion_scope`;
+
+-- ==========================================
+-- TẠO BẢNG MỚI ĐÁP ỨNG TÍNH NĂNG
+-- ==========================================
+
+-- 7. Liên kết Khuyến mãi với Sản phẩm cụ thể (Giải quyết review: chưa liên kết sản phẩm)
+CREATE TABLE `promotion_products` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `promotion_id` BIGINT UNSIGNED NOT NULL,
+  `product_id` BIGINT UNSIGNED NOT NULL,
+  UNIQUE KEY `uk_promo_product` (`promotion_id`, `product_id`),
+  CONSTRAINT `fk_pp_promo` FOREIGN KEY (`promotion_id`) REFERENCES `promotions`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_pp_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 8. Ghi nhận lịch sử dùng mã giảm giá (Giải quyết review: chưa có lịch sử dùng mã)
+CREATE TABLE `order_promotions` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `order_id` BIGINT UNSIGNED NOT NULL,
+  `promotion_id` BIGINT UNSIGNED NOT NULL,
+  `discount_amount` DECIMAL(18,2) NOT NULL,
+  CONSTRAINT `fk_op_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_op_promo` FOREIGN KEY (`promotion_id`) REFERENCES `promotions`(`id`)
+) ENGINE=InnoDB;
+
+-- 9. Quảng cáo Banner (Giải quyết yêu cầu text 2.1)
+CREATE TABLE `banners` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `type` ENUM('POPUP', 'HOME_CAROUSEL') NOT NULL DEFAULT 'HOME_CAROUSEL',
+  `title` VARCHAR(200) NOT NULL,
+  `image_file_id` BIGINT UNSIGNED NOT NULL,
+  `link_url` VARCHAR(500) NULL COMMENT 'Link trỏ về trang kết quả tìm kiếm/sản phẩm',
+  `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
+  `starts_at` DATETIME NULL,
+  `ends_at` DATETIME NULL,
+  CONSTRAINT `fk_banner_file` FOREIGN KEY (`image_file_id`) REFERENCES `files`(`id`)
+) ENGINE=InnoDB;
+
+-- 10. Khởi tạo quyền cho nhân viên (bảng permissions đang rỗng nên STAFF chưa thêm được sản phẩm)
+INSERT INTO `permissions` (`code`, `name`) VALUES
+('PRODUCT_MANAGE', 'Quản lý sản phẩm và nhập hàng');
+
+INSERT INTO `role_permissions` (`role_id`, `permission_id`)
+SELECT r.id, p.id FROM `roles` r JOIN `permissions` p ON p.code = 'PRODUCT_MANAGE'
+WHERE r.code = 'STAFF';

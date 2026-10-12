@@ -5,7 +5,7 @@
     "scripts": {
         "start": "node src/index.js",
         "dev": "nodemon src/index.js",
-        "test": "node tests/response.test.js && node tests/auth.test.js && node tests/account.test.js"
+        "test": "node test/run-tests.js"
     },
     "keywords": [],
     "author": "",
@@ -17,13 +17,16 @@
         "dayjs": "^1.11.21",
         "dotenv": "^17.4.2",
         "express": "^5.2.1",
+        "fs": "^0.0.1-security",
         "jsonwebtoken": "^9.0.3",
-        "multer": "^2.2.0",
+        "multer": "^2.4.0",
         "mysql2": "^3.22.5",
         "nodemailer": "^9.0.1",
         "nodemon": "^3.1.14",
+        "slugify": "^1.6.9",
         "socket.io": "^4.8.3",
         "uuid": "^14.0.1",
-        "vnpay": "^2.5.0"
+        "vnpay": "^2.5.0",
+        "xlsx": "^0.18.5"
     }
 }
