@@ -44,22 +44,7 @@ const imageFilter = (req, file, cb) => {
     }
 };
 
-// Bộ lọc chỉ cho phép tải lên file Excel/CSV (dùng cho chức năng Import)
-const excelFilter = (req, file, cb) => {
-    const allowedMimeTypes = [
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-        'application/vnd.ms-excel', // .xls
-        'text/csv' // .csv
-    ];
-
-    if (allowedMimeTypes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error('Chỉ cho phép tải lên file Excel (.xlsx, .xls) hoặc CSV'), false);
-    }
-};
-
-const limits = { fileSize: 10 * 1024 * 1024 }; // Giới hạn 10MB để up được file Excel lớn
+const limits = { fileSize: 10 * 1024 * 1024 }; // Giới hạn mỗi file tối đa 10MB
 
 // Bọc middleware của multer để trả lỗi theo đúng chuẩn Response
 const handleUpload = (multerMiddleware) => {
@@ -78,10 +63,6 @@ const handleUpload = (multerMiddleware) => {
 // Ảnh sản phẩm: gửi lên ở field "images", tối đa 10 ảnh -> req.files
 const uploadImages = handleUpload(multer({ storage, fileFilter: imageFilter, limits }).array('images', 10));
 
-// File Excel: gửi lên ở field "file", chỉ 1 file -> req.file
-const uploadExcel = handleUpload(multer({ storage, fileFilter: excelFilter, limits }).single('file'));
-
 module.exports = {
-    uploadImages,
-    uploadExcel
+    uploadImages
 };

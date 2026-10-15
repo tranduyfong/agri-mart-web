@@ -8,6 +8,7 @@ const dbPool = mysql.createPool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT,
+    decimalNumbers: true,     // Trả cột DECIMAL (giá tiền, số lượng) về dạng số thay vì chuỗi "25000.00"
     waitForConnections: true, // Hàng đợi nếu các kết nối đang bận
     connectionLimit: 10,      // Giới hạn số lượng kết nối đồng thời (tùy chỉnh theo server)
     queueLimit: 0             // Không giới hạn hàng đợi

@@ -1,24 +1,11 @@
 const authService = require('../services/auth.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 6;
+// Lưu ý: việc kiểm tra dữ liệu nhập (bắt buộc, định dạng email, độ dài mật khẩu...) đã được xử lý ở FE
 
 const register = async (req, res) => {
     try {
         const { full_name, email, password, phone } = req.body;
-
-        if (!email || !password || !full_name) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Tên, Email và Password là bắt buộc', 400);
-        }
-
-        if (typeof email !== 'string' || !EMAIL_REGEX.test(email)) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Email không đúng định dạng', 400);
-        }
-
-        if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
-            return errorResponse(res, 'VALIDATION_FAILED', `Mật khẩu phải là chuỗi có ít nhất ${MIN_PASSWORD_LENGTH} ký tự`, 400);
-        }
 
         // phone không bắt buộc, nếu không gửi lên thì lưu NULL
         const result = await authService.registerUser({ full_name, email, password, phone: phone || null });
@@ -38,9 +25,6 @@ const register = async (req, res) => {
 const verifyEmail = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        if (!email || !otp) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Email và mã xác minh là bắt buộc', 400);
-        }
 
         await authService.verifyEmailAccount(email, otp);
 
@@ -59,9 +43,6 @@ const verifyEmail = async (req, res) => {
 const resendVerifyEmail = async (req, res) => {
     try {
         const { email } = req.body;
-        if (!email) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Email là bắt buộc', 400);
-        }
 
         await authService.resendVerifyEmail(email);
 
@@ -77,10 +58,6 @@ const resendVerifyEmail = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Email và mật khẩu là bắt buộc', 400);
-        }
 
         const result = await authService.loginUser(email, password);
 
@@ -102,9 +79,6 @@ const login = async (req, res) => {
 const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
-        if (!email) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Email là bắt buộc', 400);
-        }
 
         await authService.requestPasswordReset(email);
 
@@ -120,9 +94,6 @@ const forgotPassword = async (req, res) => {
 const verifyOtpForgotPassword = async (req, res) => {
     try {
         const { email, otp } = req.body;
-        if (!email || !otp) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Email và OTP là bắt buộc', 400);
-        }
 
         await authService.verifyResetOtp(email, otp);
 
@@ -147,14 +118,6 @@ const verifyOtpForgotPassword = async (req, res) => {
 const resetPassword = async (req, res) => {
     try {
         const { email, otp, newPassword } = req.body;
-
-        if (!email || !otp || !newPassword) {
-            return errorResponse(res, 'VALIDATION_FAILED', 'Vui lòng cung cấp đầy đủ email, OTP và mật khẩu mới', 400);
-        }
-
-        if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
-            return errorResponse(res, 'VALIDATION_FAILED', `Mật khẩu mới phải là chuỗi có ít nhất ${MIN_PASSWORD_LENGTH} ký tự`, 400);
-        }
 
         await authService.resetPassword(email, otp, newPassword);
 

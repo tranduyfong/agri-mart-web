@@ -8,8 +8,14 @@ const PORT = process.env.PORT || 8000;
 
 // Middlewares cơ bản
 app.use(cors());
-app.use(express.json()); // Để parse body dạng JSON
+app.use(express.json({ limit: '5mb' })); // Để parse body dạng JSON (nâng giới hạn để nhập hàng được danh sách dài)
 app.use(express.urlencoded({ extended: true }));
+
+// Express 5: request không có body thì req.body = undefined, gán {} để controller destructure không bị lỗi
+app.use((req, res, next) => {
+    if (!req.body) req.body = {};
+    next();
+});
 
 // Cho phép truy cập ảnh đã upload qua đường dẫn /uploads/...
 app.use('/uploads', express.static('uploads'));
@@ -26,6 +32,9 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
     if (err.type === 'entity.parse.failed') {
         return errorResponse(res, 'VALIDATION_FAILED', 'Dữ liệu JSON gửi lên không hợp lệ', 400);
+    }
+    if (err.type === 'entity.too.large') {
+        return errorResponse(res, 'PAYLOAD_TOO_LARGE', 'Dữ liệu gửi lên quá lớn (tối đa 5MB)', 413);
     }
     return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, err.message);
 });
