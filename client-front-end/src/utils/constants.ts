@@ -6,8 +6,12 @@ export const ROUTES = {
   VERIFY_EMAIL: '/verify-email',
   FORGOT_PASSWORD: '/forgot-password',
   SHOP: '/shop',
+  PRODUCT_DETAIL: '/product/:slug',
   CONTACT: '/contact',
 };
+
+// Dùng chung cho các link từ thẻ sản phẩm và danh sách đã xem
+export const getProductDetailPath = (slug: string) => ROUTES.PRODUCT_DETAIL.replace(':slug', encodeURIComponent(slug));
 
 // Thông tin cửa hàng hiển thị trên thanh trên cùng
 export const STORE_INFO = {

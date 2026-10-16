@@ -1,11 +1,13 @@
 import { App } from 'antd';
+import { Link } from 'react-router-dom';
 import { CheckCircleFilled, HeartOutlined, ShoppingCartOutlined, ShoppingOutlined } from '@ant-design/icons';
-import type { ProductListItem } from '../types/product';
+import type { ProductCardItem } from '../types/product';
 import { getFileUrl } from '../utils/fileUrl';
 import { formatPrice, formatStock } from '../utils/format';
+import { getProductDetailPath } from '../utils/constants';
 
 interface ProductCardProps {
-  product: ProductListItem;
+  product: ProductCardItem;
 }
 
 // Thẻ sản phẩm: ảnh, nút yêu thích, % giảm giá, tồn kho, tên, giá / đơn vị, nút thêm vào giỏ
@@ -13,6 +15,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const { message } = App.useApp();
   const imageUrl = getFileUrl(product.thumbnail_url);
   const isOutOfStock = product.total_stock <= 0;
+  const detailPath = getProductDetailPath(product.slug);
 
   // Giá sau khi giảm (nếu sản phẩm đang có khuyến mãi theo %)
   const originalPrice = product.min_price || 0;
@@ -27,11 +30,17 @@ const ProductCard = ({ product }: ProductCardProps) => {
     <div className="flex h-full flex-col rounded-xl border border-gray-100 bg-white p-3 transition hover:shadow-md">
       {/* Ảnh sản phẩm */}
       <div className="relative flex h-32 items-center justify-center rounded-lg bg-gray-50">
-        {imageUrl ? (
-          <img src={imageUrl} alt={product.name} className="h-24 w-24 object-contain" />
-        ) : (
-          <ShoppingOutlined className="text-4xl text-gray-300" />
-        )}
+        <Link
+          to={detailPath}
+          aria-label={`Xem ${product.name}`}
+          className="flex h-full w-full items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          {imageUrl ? (
+            <img src={imageUrl} alt={product.name} loading="lazy" className="h-24 w-24 object-contain" />
+          ) : (
+            <ShoppingOutlined className="text-4xl text-gray-300" />
+          )}
+        </Link>
 
         {product.discount_percent && (
           <span className="absolute top-2 left-2 rounded-md bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
@@ -56,7 +65,9 @@ const ProductCard = ({ product }: ProductCardProps) => {
       </div>
 
       {/* Tên + giá */}
-      <h3 className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold text-gray-900">{product.name}</h3>
+      <h3 className="mt-1 line-clamp-2 min-h-10 text-sm font-semibold text-gray-900">
+        <Link to={detailPath} className="text-gray-900 hover:text-primary">{product.name}</Link>
+      </h3>
 
       <div className="mt-auto flex items-end justify-between gap-2 pt-2">
         <div>

@@ -5,6 +5,7 @@ import RegisterPage from '../pages/RegisterPage';
 import VerifyEmailPage from '../pages/VerifyEmailPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ShopPage from '../pages/ShopPage';
+import ProductDetailPage from '../pages/ProductDetailPage';
 import { ROUTES } from '../utils/constants';
 
 // Khai báo các trang của ứng dụng: mỗi đường dẫn (path) tương ứng với 1 trang (element)
@@ -32,6 +33,10 @@ export const router = createBrowserRouter([
   {
     path: ROUTES.SHOP,
     element: <ShopPage />,
+  },
+  {
+    path: ROUTES.PRODUCT_DETAIL,
+    element: <ProductDetailPage />,
   },
   {
     // Đường dẫn không tồn tại -> về trang chủ

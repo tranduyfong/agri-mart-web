@@ -154,7 +154,11 @@ const getProducts = async (filters, pagination) => {
  */
 const getProductDetail = async ({ id, slug, onlyPublished }) => {
     let sql = `SELECT p.id, p.code, p.name, p.slug, p.description, p.status, p.created_at,
-                      p.category_id, c.name AS category_name
+                      p.category_id, c.name AS category_name,
+                      (SELECT MAX(pr.discount_value)
+                         FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
+                        WHERE pp.product_id = p.id AND pr.discount_type = 'PERCENT'
+                          AND ${ACTIVE_PROMOTION_CONDITION}) AS discount_percent
                FROM products p
                JOIN categories c ON c.id = p.category_id
                WHERE ${id ? 'p.id = ?' : 'p.slug = ?'}`;
