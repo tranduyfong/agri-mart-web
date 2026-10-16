@@ -24,15 +24,6 @@ export const NAV_LINKS = [
   { label: 'Liên hệ', path: ROUTES.CONTACT },
 ];
 
-// Danh mục sản phẩm (tạm thời để cố định, sau này sẽ lấy từ API)
-export const CATEGORY_ITEMS = [
-  { key: 'rau-cu', label: 'Rau củ' },
-  { key: 'trai-cay', label: 'Trái cây' },
-  { key: 'thit-ca', label: 'Thịt & Cá' },
-  { key: 'gao-ngu-coc', label: 'Gạo & Ngũ cốc' },
-  { key: 'do-kho', label: 'Đồ khô' },
-];
-
 // Các cột link ở chân trang
 export const FOOTER_LINK_GROUPS = [
   {

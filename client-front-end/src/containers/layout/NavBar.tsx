@@ -14,23 +14,16 @@ import {
 } from '@ant-design/icons';
 import Logo from '../../components/Logo';
 import IconButton from '../../components/IconButton';
+import useCategories from '../../hooks/useCategories';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { logout } from '../../store/slices/authSlice';
 import { clearAuth } from '../../utils/authStorage';
-import { CATEGORY_ITEMS, NAV_LINKS, ROUTES } from '../../utils/constants';
+import { NAV_LINKS, ROUTES } from '../../utils/constants';
 
 // Danh sách ngôn ngữ (hiện tại chỉ là giao diện, chưa đổi ngôn ngữ thật)
 const LANGUAGE_ITEMS: MenuProps['items'] = [
   { key: 'vi', label: 'Tiếng Việt' },
   { key: 'en', label: 'Tiếng Anh' },
-];
-
-// Menu hiển thị trong ngăn kéo (Drawer) khi xem trên điện thoại
-const MOBILE_MENU_ITEMS: MenuProps['items'] = [
-  { key: NAV_LINKS[0].path, label: NAV_LINKS[0].label },
-  { key: 'category', label: 'Danh mục', children: CATEGORY_ITEMS },
-  { key: NAV_LINKS[1].path, label: NAV_LINKS[1].label },
-  { key: NAV_LINKS[2].path, label: NAV_LINKS[2].label },
 ];
 
 // Menu khi bấm vào tên người dùng (đã đăng nhập)
@@ -47,7 +40,22 @@ const NavBar = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user); // null nếu chưa đăng nhập
+  const { categories } = useCategories();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Menu danh mục lấy từ API, key là đường dẫn tới trang cửa hàng đã lọc theo danh mục đó
+  const categoryMenuItems: MenuProps['items'] = categories.map((category) => ({
+    key: `${ROUTES.SHOP}?category_id=${category.id}`,
+    label: category.name,
+  }));
+
+  // Menu hiển thị trong ngăn kéo (Drawer) khi xem trên điện thoại
+  const mobileMenuItems: MenuProps['items'] = [
+    { key: NAV_LINKS[0].path, label: NAV_LINKS[0].label },
+    { key: 'category', label: 'Danh mục', children: categoryMenuItems },
+    { key: NAV_LINKS[1].path, label: NAV_LINKS[1].label },
+    { key: NAV_LINKS[2].path, label: NAV_LINKS[2].label },
+  ];
 
   // Bấm vào 1 mục trong menu người dùng
   const handleUserMenuClick: MenuProps['onClick'] = (item) => {
@@ -78,7 +86,7 @@ const NavBar = () => {
             Trang chủ
           </NavLink>
 
-          <Dropdown menu={{ items: CATEGORY_ITEMS }}>
+          <Dropdown menu={{ items: categoryMenuItems, onClick: (item) => navigate(item.key) }}>
             <button type="button" className="flex cursor-pointer items-center gap-1 text-gray-800 hover:text-primary">
               Danh mục <DownOutlined className="text-xs" />
             </button>
@@ -94,8 +102,9 @@ const NavBar = () => {
 
         {/* Các nút bên phải */}
         <div className="flex items-center gap-1 sm:gap-2">
-          <IconButton icon={<ShoppingCartOutlined />} label="Giỏ hàng" />
+          {/* Các icon chỉ hiện từ màn hình tablet trở lên (điện thoại không đủ chỗ) */}
           <div className="hidden items-center gap-2 sm:flex">
+            <IconButton icon={<ShoppingCartOutlined />} label="Giỏ hàng" />
             <IconButton icon={<HeartOutlined />} label="Yêu thích" />
             <IconButton icon={<BellOutlined />} label="Thông báo" />
 
@@ -137,7 +146,7 @@ const NavBar = () => {
         open={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
       >
-        <Menu mode="inline" items={MOBILE_MENU_ITEMS} onClick={handleMobileMenuClick} className="border-none" />
+        <Menu mode="inline" items={mobileMenuItems} onClick={handleMobileMenuClick} className="border-none" />
       </Drawer>
     </header>
   );

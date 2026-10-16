@@ -26,7 +26,8 @@ const getProductFilters = (query) => {
         min_price: getQueryNumber(query.min_price),
         max_price: getQueryNumber(query.max_price),
         status: query.status || null,
-        sort: query.sort || 'newest'
+        on_sale: query.on_sale === 'true', // ?on_sale=true: chỉ lấy sản phẩm đang khuyến mãi
+        sort: query.sort || 'newest' // newest, price_asc, price_desc, name_asc, best_selling, trending
     };
 };
 

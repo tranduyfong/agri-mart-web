@@ -12,8 +12,13 @@ const SORT_OPTIONS = {
     newest: 'p.created_at DESC, p.id DESC',
     price_asc: 'min_price ASC, p.id DESC',
     price_desc: 'min_price DESC, p.id DESC',
-    name_asc: 'p.name ASC, p.id DESC'
+    name_asc: 'p.name ASC, p.id DESC',
+    best_selling: 'sold_quantity DESC, p.id DESC', // Bán chạy nhất (từ trước tới nay)
+    trending: 'sold_last_30_days DESC, sold_quantity DESC, p.id DESC' // Xu hướng (bán nhiều trong 30 ngày gần đây)
 };
+
+// Điều kiện "khuyến mãi đang diễn ra" (bảng promotions đặt tên là pr)
+const ACTIVE_PROMOTION_CONDITION = 'pr.valid_from <= NOW() AND pr.valid_to >= NOW()';
 
 // Lưu ảnh sản phẩm: bảng files -> lấy file_id -> bảng product_images
 const insertProductImages = async (connection, productId, uploadedFiles, userId) => {
@@ -50,11 +55,11 @@ const ensureThumbnail = async (connection, productId) => {
 
 /**
  * Lấy danh sách sản phẩm có tìm kiếm, bộ lọc và phân trang
- * filters: { keyword, category_id, min_price, max_price, status, sort }
+ * filters: { keyword, category_id, min_price, max_price, status, on_sale, sort }
  * pagination: { pageSize, offset }
  */
 const getProducts = async (filters, pagination) => {
-    const { keyword, category_id, min_price, max_price, status, sort } = filters;
+    const { keyword, category_id, min_price, max_price, status, on_sale, sort } = filters;
 
     // Ghép điều kiện WHERE theo từng bộ lọc.
     // Muốn thêm bộ lọc mới (VD: lọc theo chi nhánh còn hàng) chỉ cần thêm 1 khối if giống bên dưới
@@ -90,6 +95,12 @@ const getProducts = async (filters, pagination) => {
         conditions.push(`EXISTS (SELECT 1 FROM product_variants v WHERE ${priceCondition})`);
     }
 
+    // Chỉ lấy sản phẩm đang nằm trong 1 chương trình khuyến mãi còn hiệu lực
+    if (on_sale) {
+        conditions.push(`EXISTS (SELECT 1 FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
+                                 WHERE pp.product_id = p.id AND ${ACTIVE_PROMOTION_CONDITION})`);
+    }
+
     const whereSql = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     // 1. Đếm tổng số sản phẩm thỏa điều kiện (để tính totalPages)
@@ -102,12 +113,27 @@ const getProducts = async (filters, pagination) => {
                 p.category_id, c.name AS category_name,
                 (SELECT MIN(v.list_price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
                 (SELECT MAX(v.list_price) FROM product_variants v WHERE v.product_id = p.id) AS max_price,
+                (SELECT v.unit FROM product_variants v WHERE v.product_id = p.id ORDER BY v.list_price LIMIT 1) AS unit,
                 (SELECT COALESCE(SUM(bs.stock_quantity), 0)
                    FROM branch_stock bs JOIN product_variants v ON v.id = bs.variant_id
                   WHERE v.product_id = p.id AND bs.expiry_date >= CURDATE()) AS total_stock,
                 (SELECT f.url
                    FROM product_images pi JOIN files f ON f.id = pi.file_id
-                  WHERE pi.product_id = p.id AND pi.is_thumbnail = 1 LIMIT 1) AS thumbnail_url
+                  WHERE pi.product_id = p.id AND pi.is_thumbnail = 1 LIMIT 1) AS thumbnail_url,
+                (SELECT COALESCE(SUM(oi.quantity), 0)
+                   FROM order_items oi
+                   JOIN orders o ON o.id = oi.order_id
+                   JOIN product_variants v ON v.id = oi.variant_id
+                  WHERE v.product_id = p.id AND o.status = 'COMPLETED') AS sold_quantity,
+                (SELECT COALESCE(SUM(oi.quantity), 0)
+                   FROM order_items oi
+                   JOIN orders o ON o.id = oi.order_id
+                   JOIN product_variants v ON v.id = oi.variant_id
+                  WHERE v.product_id = p.id AND o.status = 'COMPLETED'
+                    AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS sold_last_30_days,
+                (SELECT MAX(pr.discount_value)
+                   FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
+                  WHERE pp.product_id = p.id AND pr.discount_type = 'PERCENT' AND ${ACTIVE_PROMOTION_CONDITION}) AS discount_percent
          FROM products p
          JOIN categories c ON c.id = p.category_id
          ${whereSql}

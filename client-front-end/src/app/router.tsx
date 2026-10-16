@@ -4,6 +4,7 @@ import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import VerifyEmailPage from '../pages/VerifyEmailPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
+import ShopPage from '../pages/ShopPage';
 import { ROUTES } from '../utils/constants';
 
 // Khai báo các trang của ứng dụng: mỗi đường dẫn (path) tương ứng với 1 trang (element)
@@ -27,6 +28,10 @@ export const router = createBrowserRouter([
   {
     path: ROUTES.FORGOT_PASSWORD,
     element: <ForgotPasswordPage />,
+  },
+  {
+    path: ROUTES.SHOP,
+    element: <ShopPage />,
   },
   {
     // Đường dẫn không tồn tại -> về trang chủ

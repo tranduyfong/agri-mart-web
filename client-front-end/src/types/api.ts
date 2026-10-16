@@ -6,3 +6,11 @@ export interface ApiResponse<T> {
   serverTime: string;
   data: T;
 }
+
+// Response của các API danh sách có phân trang
+export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  pageNumber: number; // Trang hiện tại, bắt đầu từ 0
+  pageSize: number; // Số bản ghi mỗi trang
+  totalElements: number; // Tổng số bản ghi
+  totalPages: number; // Tổng số trang
+}
