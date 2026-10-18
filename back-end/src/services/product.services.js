@@ -59,12 +59,18 @@ const ensureThumbnail = async (connection, productId) => {
  * pagination: { pageSize, offset }
  */
 const getProducts = async (filters, pagination) => {
-    const { keyword, category_id, min_price, max_price, status, on_sale, sort } = filters;
+    const { keyword, category_id, min_price, max_price, status, on_sale, sort, wishlist_user_id } = filters;
 
     // Ghép điều kiện WHERE theo từng bộ lọc.
     // Muốn thêm bộ lọc mới (VD: lọc theo chi nhánh còn hàng) chỉ cần thêm 1 khối if giống bên dưới
     const conditions = [];
     const params = [];
+
+    // Bộ lọc nội bộ từ wishlistService, không nhận user_id từ query của khách hàng
+    if (wishlist_user_id) {
+        conditions.push('EXISTS (SELECT 1 FROM wishlist_items wi WHERE wi.product_id = p.id AND wi.user_id = ?)');
+        params.push(wishlist_user_id);
+    }
 
     if (status) {
         conditions.push('p.status = ?');

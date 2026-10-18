@@ -11,7 +11,7 @@ const useRecentlyViewedProducts = (currentSlug: string) => {
 
   useEffect(() => {
     let isOutdated = false;
-    saveViewedProduct(currentSlug);
+    if (currentSlug) saveViewedProduct(currentSlug);
 
     Promise.allSettled(slugs.map((slug) => productService.getProductDetail(slug)))
       .then((results) => {

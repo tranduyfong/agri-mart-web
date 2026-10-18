@@ -40,6 +40,8 @@ const NavBar = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user); // null nếu chưa đăng nhập
+  const { cart, wishlist, cartVersion, wishlistVersion } = useAppSelector((state) => state.shopping);
+  const cartCount = Math.round(cart.reduce((total, item) => total + item.quantity, 0) * 1000) / 1000;
   const { categories } = useCategories();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -55,6 +57,8 @@ const NavBar = () => {
     { key: 'category', label: 'Danh mục', children: categoryMenuItems },
     { key: NAV_LINKS[1].path, label: NAV_LINKS[1].label },
     { key: NAV_LINKS[2].path, label: NAV_LINKS[2].label },
+    { key: ROUTES.CART, label: `Giỏ hàng (${cartCount})`, icon: <ShoppingCartOutlined /> },
+    { key: ROUTES.WISHLIST, label: `Yêu thích (${wishlist.length})`, icon: <HeartOutlined /> },
   ];
 
   // Bấm vào 1 mục trong menu người dùng
@@ -76,9 +80,9 @@ const NavBar = () => {
   };
 
   return (
-    <header className="border-b border-gray-100 bg-white">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Logo />
+    <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-4">
+        <div className="[&_span]:text-base [&_svg]:h-6 [&_svg]:w-6 sm:[&_span]:text-xl sm:[&_svg]:h-7 sm:[&_svg]:w-7"><Logo /></div>
 
         {/* Menu chính, chỉ hiện trên màn hình lớn */}
         <nav className="hidden items-center gap-10 text-sm font-medium lg:flex">
@@ -102,10 +106,12 @@ const NavBar = () => {
 
         {/* Các nút bên phải */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Các icon chỉ hiện từ màn hình tablet trở lên (điện thoại không đủ chỗ) */}
+          {/* Giỏ và yêu thích luôn hiện, kể cả trên điện thoại để nhìn thấy số vừa thêm */}
+          <div className="flex items-center gap-0 sm:gap-2" aria-live="polite">
+            <IconButton icon={<ShoppingCartOutlined />} label={`Giỏ hàng (${cartCount})`} count={cartCount} pulseKey={cartVersion} shoppingTarget="cart" onClick={() => navigate(ROUTES.CART)} />
+            <IconButton icon={<HeartOutlined />} label={`Yêu thích (${wishlist.length})`} count={wishlist.length} pulseKey={wishlistVersion} shoppingTarget="wishlist" onClick={() => navigate(ROUTES.WISHLIST)} />
+          </div>
           <div className="hidden items-center gap-2 sm:flex">
-            <IconButton icon={<ShoppingCartOutlined />} label="Giỏ hàng" />
-            <IconButton icon={<HeartOutlined />} label="Yêu thích" />
             <IconButton icon={<BellOutlined />} label="Thông báo" />
 
             <Dropdown menu={{ items: LANGUAGE_ITEMS }}>
@@ -120,7 +126,7 @@ const NavBar = () => {
             <Dropdown menu={{ items: USER_MENU_ITEMS, onClick: handleUserMenuClick }}>
               <button
                 type="button"
-                className="ml-2 flex cursor-pointer items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-800"
+                className="ml-2 hidden cursor-pointer items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-800 sm:flex"
               >
                 <UserOutlined />
                 <span className="hidden max-w-36 truncate sm:inline">{user.full_name}</span>
@@ -128,7 +134,7 @@ const NavBar = () => {
               </button>
             </Dropdown>
           ) : (
-            <Button type="primary" shape="round" className="ml-2 font-semibold" onClick={() => navigate(ROUTES.LOGIN)}>
+            <Button type="primary" shape="round" className="ml-2 hidden font-semibold sm:inline-flex" onClick={() => navigate(ROUTES.LOGIN)}>
               Đăng nhập
             </Button>
           )}
@@ -147,6 +153,8 @@ const NavBar = () => {
         onClose={() => setIsMobileMenuOpen(false)}
       >
         <Menu mode="inline" items={mobileMenuItems} onClick={handleMobileMenuClick} className="border-none" />
+        {!user && <Button type="primary" block className="mt-4" onClick={() => { setIsMobileMenuOpen(false); navigate(ROUTES.LOGIN); }}>Đăng nhập</Button>}
+        {user && <div className="mt-5 border-t border-gray-100 pt-4"><p className="mb-3 text-sm font-semibold">{user.full_name}</p><Button block icon={<LogoutOutlined />} onClick={() => { clearAuth(); dispatch(logout()); setIsMobileMenuOpen(false); navigate(ROUTES.LOGIN); }}>Đăng xuất</Button></div>}
       </Drawer>
     </header>
   );

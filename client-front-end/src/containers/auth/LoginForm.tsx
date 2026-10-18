@@ -52,7 +52,8 @@ const LoginForm = () => {
       dispatch(setCredentials({ user, accessToken }));
 
       message.success(response.message);
-      navigate(ROUTES.HOME);
+      const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
+      navigate(returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : ROUTES.HOME, { replace: true });
     } catch (error) {
       if (getErrorCode(error) === 'ACCOUNT_UNVERIFIED') {
         await handleUnverifiedAccount(email);

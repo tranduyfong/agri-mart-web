@@ -1,7 +1,14 @@
 import { App } from 'antd';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircleFilled, HeartOutlined, ShoppingCartOutlined, ShoppingOutlined } from '@ant-design/icons';
-import type { ProductCardItem } from '../types/product';
+import { CheckCircleFilled, HeartFilled, HeartOutlined, LoadingOutlined, ShoppingCartOutlined, ShoppingOutlined } from '@ant-design/icons';
+import type { ProductCardItem, ProductDetail } from '../types/product';
+import AddToCartModal from './AddToCartModal';
+import useShoppingActions from '../hooks/useShoppingActions';
+import { useAppSelector } from '../hooks/useRedux';
+import productService from '../services/productService';
+import { getErrorMessage } from '../utils/errorMessage';
+import { getMaxQuantity, normalizeQuantity } from '../utils/productQuantity';
 import { getFileUrl } from '../utils/fileUrl';
 import { formatPrice, formatStock } from '../utils/format';
 import { getProductDetailPath } from '../utils/constants';
@@ -13,6 +20,11 @@ interface ProductCardProps {
 // Thẻ sản phẩm: ảnh, nút yêu thích, % giảm giá, tồn kho, tên, giá / đơn vị, nút thêm vào giỏ
 const ProductCard = ({ product }: ProductCardProps) => {
   const { message } = App.useApp();
+  const { requireLogin, runMutation, isBusy } = useShoppingActions();
+  const isFavorite = useAppSelector((state) => state.shopping.wishlist.some((item) => item.id === product.id));
+  const [isAdding, setIsAdding] = useState(false);
+  const addingRef = useRef(false);
+  const [quickProduct, setQuickProduct] = useState<ProductDetail | null>(null);
   const imageUrl = getFileUrl(product.thumbnail_url);
   const isOutOfStock = product.total_stock <= 0;
   const detailPath = getProductDetailPath(product.slug);
@@ -21,9 +33,25 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const originalPrice = product.min_price || 0;
   const salePrice = product.discount_percent ? originalPrice * (1 - product.discount_percent / 100) : originalPrice;
 
-  // Giỏ hàng và yêu thích chưa có API nên tạm thời chỉ thông báo
-  const showComingSoon = () => {
-    message.info('Tính năng đang được phát triển');
+  const toggleFavorite = (source: HTMLElement) => {
+    runMutation({ kind: isFavorite ? 'removeWishlist' : 'addWishlist', productId: product.id }, source);
+  };
+
+  const addToCart = async (source: HTMLElement) => {
+    if (addingRef.current || !requireLogin()) return;
+    addingRef.current = true;
+    setIsAdding(true);
+    try {
+      const response = await productService.getProductDetail(product.slug);
+      if (response.data.variants.length > 1) {
+        setQuickProduct(response.data);
+      } else {
+        const variant = response.data.variants[0];
+        if (!variant || getMaxQuantity(variant) === 0) { message.warning('Sản phẩm hiện đã hết hàng'); return; }
+        await runMutation({ kind: 'addCart', variantId: variant.id, quantity: normalizeQuantity(1, variant) }, source, imageUrl);
+      }
+    } catch (error) { message.error(getErrorMessage(error)); }
+    finally { setIsAdding(false); addingRef.current = false; }
   };
 
   return (
@@ -50,11 +78,13 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         <button
           type="button"
-          aria-label="Thêm vào yêu thích"
-          onClick={showComingSoon}
-          className="absolute top-2 right-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white text-gray-600 shadow-sm hover:text-red-500"
+          aria-label={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+          aria-pressed={isFavorite}
+          disabled={isBusy}
+          onClick={(event) => toggleFavorite(event.currentTarget)}
+          className={`absolute top-2 right-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-sm hover:text-red-500 disabled:cursor-wait ${isFavorite ? 'text-red-500' : 'text-gray-600'}`}
         >
-          <HeartOutlined />
+          <span key={String(isFavorite)} className={isFavorite ? 'shopping-bump inline-flex' : 'inline-flex'}>{isFavorite ? <HeartFilled /> : <HeartOutlined />}</span>
         </button>
       </div>
 
@@ -83,13 +113,14 @@ const ProductCard = ({ product }: ProductCardProps) => {
         <button
           type="button"
           aria-label="Thêm vào giỏ hàng"
-          disabled={isOutOfStock}
-          onClick={showComingSoon}
+          disabled={isOutOfStock || isAdding || isBusy}
+          onClick={(event) => addToCart(event.currentTarget)}
           className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          <ShoppingCartOutlined />
+          {isAdding ? <LoadingOutlined /> : <ShoppingCartOutlined />}
         </button>
       </div>
+      {quickProduct && <AddToCartModal key={quickProduct.id} product={quickProduct} onClose={() => setQuickProduct(null)} />}
     </div>
   );
 };

@@ -7,11 +7,12 @@ interface QuantitySelectorProps {
   max: number;
   unit: string;
   onChange: (value: number) => void;
+  disabled?: boolean;
 }
 
 // Chọn số lượng theo đơn vị và bước bán của quy cách đang chọn
-const QuantitySelector = ({ value, step, max, unit, onChange }: QuantitySelectorProps) => {
-  const isDisabled = max < step;
+const QuantitySelector = ({ value, step, max, unit, onChange, disabled = false }: QuantitySelectorProps) => {
+  const isDisabled = disabled || max < step;
 
   return (
     <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white p-1.5">

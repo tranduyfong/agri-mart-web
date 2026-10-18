@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
+import { fetchShopping } from '../../store/slices/shoppingSlice';
 import TopBar from './TopBar';
 import NavBar from './NavBar';
 import Footer from './Footer';
@@ -9,6 +12,14 @@ interface MainLayoutProps {
 
 // Khung chung của các trang phía khách hàng: thanh trên cùng + thanh điều hướng + nội dung + chân trang
 const MainLayout = ({ children }: MainLayoutProps) => {
+  const dispatch = useAppDispatch();
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
+
+  // Tải lại khi mở trang hoặc đổi tài khoản để giá và số đếm luôn được đồng bộ
+  useEffect(() => {
+    if (accessToken) dispatch(fetchShopping());
+  }, [accessToken, dispatch]);
+
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar />

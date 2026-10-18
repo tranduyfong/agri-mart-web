@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { App, Button, Input } from 'antd';
-import { CheckCircleFilled, HeartOutlined, InfoCircleOutlined, ShareAltOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { CheckCircleFilled, HeartFilled, HeartOutlined, InfoCircleOutlined, ShareAltOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import useShoppingActions from '../../hooks/useShoppingActions';
+import { useAppSelector } from '../../hooks/useRedux';
+import { getFileUrl } from '../../utils/fileUrl';
 import IconButton from '../../components/IconButton';
 import PrimaryButton from '../../components/PrimaryButton';
 import QuantitySelector from '../../components/QuantitySelector';
@@ -17,6 +20,10 @@ interface ProductInfoProps {
 // Giá, số lượng và tồn kho đều lấy theo quy cách đang chọn, không dùng tổng tồn của sản phẩm
 const ProductInfo = ({ product }: ProductInfoProps) => {
   const { message, modal } = App.useApp();
+  const { runMutation, isBusy } = useShoppingActions();
+  const isFavorite = useAppSelector((state) => state.shopping.wishlist.some((item) => item.id === product.id));
+  const navigate = useNavigate();
+  const purchaseRef = useRef<HTMLDivElement>(null);
   const initialVariant = product.variants.find((variant) => getMaxQuantity(variant) > 0) || product.variants[0];
   const [selectedVariantId, setSelectedVariantId] = useState(initialVariant?.id);
   const [quantity, setQuantity] = useState(initialVariant ? normalizeQuantity(1, initialVariant) : 0);
@@ -35,8 +42,14 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
     setQuantity(normalizeQuantity(1, variant));
   };
 
-  // Giữ cùng cách xử lý với ProductCard trong lúc dự án chưa có API giỏ hàng / thanh toán
-  const showComingSoon = () => message.info('Tính năng đang được phát triển');
+  const addToCart = async (source: HTMLElement | null, goToCart = false) => {
+    if (!selectedVariant || quantity <= 0 || isBusy) return;
+    const added = await runMutation(
+      { kind: 'addCart', variantId: selectedVariant.id, quantity },
+      source, getFileUrl(product.images[0]?.url ?? null),
+    );
+    if (added && goToCart) navigate(ROUTES.CART);
+  };
 
   const shareProduct = async () => {
     const url = window.location.href;
@@ -63,7 +76,11 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
         </Link>
         <div className="flex items-center gap-1">
           <IconButton icon={<ShareAltOutlined />} label="Chia sẻ sản phẩm" onClick={shareProduct} />
-          <IconButton icon={<HeartOutlined />} label="Thêm vào yêu thích" onClick={showComingSoon} />
+          <IconButton
+            icon={isFavorite ? <HeartFilled className="text-red-500" /> : <HeartOutlined />}
+            label={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'} pressed={isFavorite} disabled={isBusy}
+            onClick={(event) => runMutation({ kind: isFavorite ? 'removeWishlist' : 'addWishlist', productId: product.id }, event.currentTarget)}
+          />
         </div>
       </div>
 
@@ -98,6 +115,7 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
                 <button
                   key={variant.id}
                   type="button"
+                  disabled={isBusy}
                   aria-pressed={variant.id === selectedVariantId}
                   onClick={() => selectVariant(variant)}
                   className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition ${variant.id === selectedVariantId ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 bg-white text-gray-600 hover:border-primary'} ${getMaxQuantity(variant) === 0 ? 'opacity-60' : ''}`}
@@ -114,7 +132,7 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
           <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
             <div>
               <p className="mb-2 text-sm font-semibold text-gray-900">Số lượng</p>
-              <QuantitySelector value={quantity} step={getQuantityStep(selectedVariant)} max={maxQuantity} unit={selectedVariant.unit} onChange={(value) => setQuantity(normalizeQuantity(value, selectedVariant))} />
+              <QuantitySelector value={quantity} step={getQuantityStep(selectedVariant)} max={maxQuantity} unit={selectedVariant.unit} disabled={isBusy} onChange={(value) => setQuantity(normalizeQuantity(value, selectedVariant))} />
             </div>
             <span role="status" className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isOutOfStock ? 'bg-gray-200 text-gray-500' : 'bg-primary/10 text-primary'}`}>
               <CheckCircleFilled />
@@ -127,12 +145,12 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
           <span className="text-gray-500">Tạm tính</span>
           <span aria-live="polite" className="text-xl font-bold text-gray-900">{formatPrice(totalPrice)}</span>
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Button size="large" block disabled={isOutOfStock} icon={<ShoppingCartOutlined />} onClick={showComingSoon} className="h-12 border-primary/10 bg-primary/15 font-semibold text-primary-dark hover:bg-primary/25">
+        <div ref={purchaseRef} className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Button size="large" block disabled={isOutOfStock || isBusy} icon={<ShoppingCartOutlined />} onClick={(event) => addToCart(event.currentTarget)} className="h-12 border-primary/10 bg-primary/15 font-semibold text-primary-dark hover:bg-primary/25">
             Thêm vào giỏ
           </Button>
           <div className="[&_button]:h-12">
-            <PrimaryButton disabled={isOutOfStock} onClick={showComingSoon}>{isOutOfStock ? 'Tạm hết hàng' : 'Mua ngay'}</PrimaryButton>
+            <PrimaryButton disabled={isOutOfStock || isBusy} onClick={() => addToCart(purchaseRef.current?.querySelector('button') ?? null, true)}>{isOutOfStock ? 'Tạm hết hàng' : 'Mua ngay'}</PrimaryButton>
           </div>
         </div>
         <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">

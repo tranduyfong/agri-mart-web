@@ -7,6 +7,8 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/forgot-password',
   SHOP: '/shop',
   PRODUCT_DETAIL: '/product/:slug',
+  CART: '/cart',
+  WISHLIST: '/wishlist',
   CONTACT: '/contact',
 };
 
@@ -33,8 +35,8 @@ export const FOOTER_LINK_GROUPS = [
   {
     title: 'Tài khoản',
     links: [
-      { label: 'Yêu thích', path: '#' },
-      { label: 'Giỏ hàng', path: '#' },
+      { label: 'Yêu thích', path: ROUTES.WISHLIST },
+      { label: 'Giỏ hàng', path: ROUTES.CART },
       { label: 'Theo dõi đơn hàng', path: '#' },
       { label: 'Thông tin giao hàng', path: '#' },
     ],

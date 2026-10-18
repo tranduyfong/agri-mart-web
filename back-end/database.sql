@@ -150,6 +150,16 @@ CREATE TABLE `cart_items` (
   `quantity` DECIMAL(14,3) NOT NULL
 ) ENGINE=InnoDB;
 
+-- Sản phẩm yêu thích được lưu theo tài khoản, mỗi sản phẩm chỉ xuất hiện một lần
+CREATE TABLE `wishlist_items` (
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `product_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`, `product_id`),
+  CONSTRAINT `fk_wishlist_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_wishlist_product` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE `orders` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `code` VARCHAR(60) NOT NULL UNIQUE,
