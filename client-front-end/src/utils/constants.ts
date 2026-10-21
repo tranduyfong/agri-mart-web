@@ -9,6 +9,9 @@ export const ROUTES = {
   PRODUCT_DETAIL: '/product/:slug',
   CART: '/cart',
   WISHLIST: '/wishlist',
+  ACCOUNT: '/account',
+  ACCOUNT_ADDRESSES: '/account/addresses',
+  ACCOUNT_PASSWORD: '/account/change-password',
   CONTACT: '/contact',
 };
 
@@ -38,7 +41,7 @@ export const FOOTER_LINK_GROUPS = [
       { label: 'Yêu thích', path: ROUTES.WISHLIST },
       { label: 'Giỏ hàng', path: ROUTES.CART },
       { label: 'Theo dõi đơn hàng', path: '#' },
-      { label: 'Thông tin giao hàng', path: '#' },
+      { label: 'Thông tin giao hàng', path: ROUTES.ACCOUNT_ADDRESSES },
     ],
   },
   {

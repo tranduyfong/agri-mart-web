@@ -24,6 +24,10 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.accessToken = action.payload.accessToken;
     },
+    // Cập nhật hồ sơ không tạo lại phiên đăng nhập hoặc làm mất trạng thái giỏ hàng
+    updateUser: (state, action: PayloadAction<AuthUser>) => {
+      if (state.user?.id === action.payload.id) state.user = action.payload;
+    },
     // Gọi khi đăng xuất
     logout: (state) => {
       state.user = null;
@@ -32,5 +36,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, updateUser, logout } = authSlice.actions;
 export default authSlice.reducer;

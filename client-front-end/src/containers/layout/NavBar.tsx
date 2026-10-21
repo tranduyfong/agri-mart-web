@@ -27,7 +27,13 @@ const LANGUAGE_ITEMS: MenuProps['items'] = [
 ];
 
 // Menu khi bấm vào tên người dùng (đã đăng nhập)
-const USER_MENU_ITEMS: MenuProps['items'] = [{ key: 'logout', label: 'Đăng xuất', icon: <LogoutOutlined /> }];
+const USER_MENU_ITEMS: MenuProps['items'] = [
+  { key: ROUTES.ACCOUNT, label: 'Thông tin cá nhân', icon: <UserOutlined /> },
+  { key: ROUTES.ACCOUNT_ADDRESSES, label: 'Sổ địa chỉ' },
+  { key: ROUTES.ACCOUNT_PASSWORD, label: 'Đổi mật khẩu' },
+  { type: 'divider' },
+  { key: 'logout', label: 'Đăng xuất', icon: <LogoutOutlined /> },
+];
 
 // Đổi màu chữ của link đang được chọn
 const getNavLinkClass = ({ isActive }: { isActive: boolean }) => {
@@ -59,10 +65,12 @@ const NavBar = () => {
     { key: NAV_LINKS[2].path, label: NAV_LINKS[2].label },
     { key: ROUTES.CART, label: `Giỏ hàng (${cartCount})`, icon: <ShoppingCartOutlined /> },
     { key: ROUTES.WISHLIST, label: `Yêu thích (${wishlist.length})`, icon: <HeartOutlined /> },
+    ...(user ? [{ key: ROUTES.ACCOUNT, label: 'Tài khoản của tôi', icon: <UserOutlined /> }] : []),
   ];
 
   // Bấm vào 1 mục trong menu người dùng
   const handleUserMenuClick: MenuProps['onClick'] = (item) => {
+    if (item.key.startsWith('/')) { navigate(item.key); return; }
     if (item.key === 'logout') {
       clearAuth(); // Xóa thông tin đăng nhập trong localStorage
       dispatch(logout()); // Xóa thông tin đăng nhập trong Redux
@@ -85,7 +93,7 @@ const NavBar = () => {
         <div className="[&_span]:text-base [&_svg]:h-6 [&_svg]:w-6 sm:[&_span]:text-xl sm:[&_svg]:h-7 sm:[&_svg]:w-7"><Logo /></div>
 
         {/* Menu chính, chỉ hiện trên màn hình lớn */}
-        <nav className="hidden items-center gap-10 text-sm font-medium lg:flex">
+        <nav className="hidden items-center gap-10 text-sm lg:flex font-bold">
           <NavLink to={ROUTES.HOME} end className={getNavLinkClass}>
             Trang chủ
           </NavLink>

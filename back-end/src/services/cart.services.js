@@ -1,110 +1,127 @@
-const db = require('../configs/database.config');
+const User = require('../models/user');
+const Product = require('../models/product');
+const Branch = require('../models/branch');
+const { getProductDiscounts } = require('./product.services');
+const { availableStock } = require('../utils/productStock.util');
 
-// Giá và tồn kho luôn đọc lại từ DB, không nhận giá do FE gửi lên
-const getCart = async (userId) => {
-    const [items] = await db.execute(
-        `SELECT ci.id, ci.quantity, v.id AS variant_id, v.name AS variant_name, v.sku,
-                v.unit, v.step_quantity, v.list_price,
-                p.id AS product_id, p.name, p.slug, p.status, c.name AS category_name,
-                b.id AS branch_id, b.name AS branch_name,
-                (SELECT COALESCE(SUM(bs.stock_quantity), 0) FROM branch_stock bs
-                  WHERE bs.variant_id = v.id AND bs.branch_id = b.id AND bs.expiry_date >= CURDATE()) AS stock_quantity,
-                (SELECT f.url FROM product_images pi JOIN files f ON f.id = pi.file_id
-                  WHERE pi.product_id = p.id ORDER BY pi.is_thumbnail DESC, pi.id LIMIT 1) AS thumbnail_url,
-                (SELECT MAX(pr.discount_value) FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
-                  WHERE pp.product_id = p.id AND pr.discount_type = 'PERCENT'
-                    AND pr.valid_from <= NOW() AND pr.valid_to >= NOW()) AS discount_percent
-         FROM cart_items ci
-         JOIN carts cart ON cart.id = ci.cart_id
-         JOIN branches b ON b.id = cart.branch_id
-         JOIN product_variants v ON v.id = ci.variant_id
-         JOIN products p ON p.id = v.product_id
-         JOIN categories c ON c.id = p.category_id
-         WHERE cart.user_id = ? ORDER BY ci.id DESC`, [userId]);
-    return items;
-};
+const validateQuantity = (quantity, step) => {
+    const units = Math.round(quantity * 1000);
+    const stepUnits = Math.round(step * 1000);
 
-// Quy đổi thành số nguyên để kiểm tra chính xác cả bước bán 0.1 / 0.5kg
-const validateQuantity = (quantity, stepQuantity) => {
-    const scaled = Math.round(quantity * 1000);
-    const step = Math.max(1, Math.round(stepQuantity * 1000));
-    if (quantity <= 0 || Math.abs(quantity * 1000 - scaled) > 0.00001 || scaled % step !== 0) {
+    if (!Number.isFinite(quantity) || quantity <= 0 || Math.abs(quantity * 1000 - units) > 0.00001 || units % stepUnits !== 0) {
         throw new Error('INVALID_QUANTITY');
     }
 };
 
-// Khóa theo tài khoản để hai request thêm đồng thời không tạo trùng dòng hoặc ghi đè số lượng
-const withUserCartLock = async (userId, operation) => {
-    const connection = await db.getConnection();
-    try {
-        await connection.beginTransaction();
-        const [users] = await connection.execute('SELECT id FROM users WHERE id = ? AND status = \'ACTIVE\' FOR UPDATE', [userId]);
-        if (users.length === 0) throw new Error('ACCOUNT_UNAVAILABLE');
-        await operation(connection);
-        await connection.commit();
-    } catch (error) {
-        await connection.rollback();
-        throw error;
-    } finally {
-        connection.release();
+const getCart = async (userId) => {
+    const user = await User.findById(userId)
+        .populate({ path: 'cart_items.product_id', populate: { path: 'category_id', select: 'name' } })
+        .populate('cart_items.branch_id', 'name');
+    if (!user) throw new Error('USER_NOT_FOUND');
+
+    const productIds = user.cart_items.filter((item) => item.product_id).map((item) => item.product_id._id);
+    const discounts = await getProductDiscounts(productIds);
+    const items = [];
+
+    for (const item of user.cart_items) {
+        const product = item.product_id;
+        const branch = item.branch_id;
+        const variant = product?.variants.id(item.variant_id);
+        if (!product || !branch || !variant) continue;
+
+        items.push({
+            id: item._id.toString(),
+            quantity: item.quantity,
+            variant_id: variant._id.toString(),
+            variant_name: variant.name,
+            sku: variant.sku,
+            unit: variant.unit,
+            step_quantity: variant.step_quantity,
+            list_price: variant.list_price,
+            product_id: product._id.toString(),
+            name: product.name,
+            slug: product.slug,
+            status: product.status,
+            category_name: product.category_id?.name || null,
+            branch_id: branch._id.toString(),
+            branch_name: branch.name,
+            stock_quantity: availableStock(variant, branch._id),
+            thumbnail_url: product.images[0] || null,
+            discount_percent: discounts[product._id.toString()] ?? null
+        });
     }
+
+    return items.reverse();
 };
 
 const addCartItem = async (userId, variantId, quantity) => {
-    await withUserCartLock(userId, async (connection) => {
-        const [variants] = await connection.execute(
-            `SELECT v.step_quantity FROM product_variants v JOIN products p ON p.id = v.product_id
-             WHERE v.id = ? AND p.status = 'PUBLISHED'`, [variantId]);
-        if (variants.length === 0) throw new Error('PRODUCT_NOT_FOUND');
-        validateQuantity(quantity, variants[0].step_quantity);
+    const user = await User.findById(userId);
+    if (!user) throw new Error('USER_NOT_FOUND');
 
-        // Ưu tiên chi nhánh đã có trong giỏ và đủ tồn cho tổng số lượng sau khi thêm.
-        // Không cộng tồn từ nhiều chi nhánh thành một dòng giỏ hàng.
-        const [branches] = await connection.execute(
-            `SELECT bs.branch_id, SUM(bs.stock_quantity) AS stock_quantity,
-                    (SELECT COALESCE(SUM(ci.quantity), 0) FROM cart_items ci JOIN carts cart ON cart.id = ci.cart_id
-                      WHERE cart.user_id = ? AND cart.branch_id = bs.branch_id AND ci.variant_id = ?) AS cart_quantity
-             FROM branch_stock bs WHERE bs.variant_id = ? AND bs.expiry_date >= CURDATE()
-             GROUP BY bs.branch_id HAVING stock_quantity >= cart_quantity + ?
-             ORDER BY cart_quantity DESC, stock_quantity DESC, bs.branch_id LIMIT 1`, [userId, variantId, variantId, quantity]);
-        if (branches.length === 0) throw new Error('INSUFFICIENT_STOCK');
-        const branchId = branches[0].branch_id;
+    const product = await Product.findOne({ 'variants._id': variantId, status: 'PUBLISHED' });
+    if (!product) throw new Error('PRODUCT_NOT_FOUND');
 
-        await connection.execute(
-            'INSERT INTO carts (user_id, branch_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)', [userId, branchId]);
-        const [[cart]] = await connection.execute('SELECT id FROM carts WHERE user_id = ? AND branch_id = ?', [userId, branchId]);
-        const [items] = await connection.execute('SELECT id FROM cart_items WHERE cart_id = ? AND variant_id = ? ORDER BY id LIMIT 1', [cart.id, variantId]);
-        if (items.length > 0) {
-            await connection.execute('UPDATE cart_items SET quantity = quantity + ? WHERE id = ?', [quantity, items[0].id]);
-        } else {
-            await connection.execute('INSERT INTO cart_items (cart_id, variant_id, quantity) VALUES (?, ?, ?)', [cart.id, variantId, quantity]);
+    const variant = product.variants.id(variantId);
+    validateQuantity(quantity, variant.step_quantity);
+
+    const branches = await Branch.find({ _id: { $in: variant.stocks.map((stock) => stock.branch_id) } });
+    const choices = [];
+
+    for (const branch of branches) {
+        const item = user.cart_items.find((entry) => entry.variant_id.equals(variantId) && entry.branch_id.equals(branch._id));
+        const inCart = item?.quantity || 0;
+        const stock = availableStock(variant, branch._id);
+
+        if (Math.round((inCart + quantity) * 1000) / 1000 <= stock) {
+            choices.push({ branch, item, inCart, stock });
         }
-    });
+    }
+
+    choices.sort((a, b) => b.inCart - a.inCart || b.stock - a.stock);
+    if (!choices.length) throw new Error('INSUFFICIENT_STOCK');
+
+    const choice = choices[0];
+    if (choice.item) {
+        choice.item.quantity = Math.round((choice.item.quantity + quantity) * 1000) / 1000;
+    } else {
+        user.cart_items.push({
+            product_id: product._id,
+            variant_id: variant._id,
+            branch_id: choice.branch._id,
+            quantity
+        });
+    }
+
+    await user.save();
 };
 
 const updateCartItem = async (userId, itemId, quantity) => {
-    await withUserCartLock(userId, async (connection) => {
-        const [items] = await connection.execute(
-            `SELECT ci.id, v.step_quantity, p.status,
-                    (SELECT COALESCE(SUM(bs.stock_quantity), 0) FROM branch_stock bs
-                      WHERE bs.variant_id = ci.variant_id AND bs.branch_id = cart.branch_id AND bs.expiry_date >= CURDATE()) AS stock_quantity
-             FROM cart_items ci JOIN carts cart ON cart.id = ci.cart_id
-             JOIN product_variants v ON v.id = ci.variant_id JOIN products p ON p.id = v.product_id
-             WHERE ci.id = ? AND cart.user_id = ?`, [itemId, userId]);
-        if (items.length === 0) throw new Error('CART_ITEM_NOT_FOUND');
-        const item = items[0];
-        if (item.status !== 'PUBLISHED') throw new Error('PRODUCT_NOT_FOUND');
-        validateQuantity(quantity, item.step_quantity);
-        if (quantity > item.stock_quantity) throw new Error('INSUFFICIENT_STOCK');
-        await connection.execute('UPDATE cart_items SET quantity = ? WHERE id = ?', [quantity, itemId]);
-    });
+    const user = await User.findById(userId);
+    if (!user) throw new Error('USER_NOT_FOUND');
+
+    const item = user.cart_items.id(itemId);
+    if (!item) throw new Error('CART_ITEM_NOT_FOUND');
+
+    const product = await Product.findOne({ _id: item.product_id, status: 'PUBLISHED' });
+    const variant = product?.variants.id(item.variant_id);
+    if (!variant) throw new Error('PRODUCT_NOT_FOUND');
+
+    validateQuantity(quantity, variant.step_quantity);
+    if (quantity > availableStock(variant, item.branch_id)) throw new Error('INSUFFICIENT_STOCK');
+
+    item.quantity = quantity;
+    await user.save();
 };
 
 const removeCartItem = async (userId, itemId) => {
-    await withUserCartLock(userId, async (connection) => {
-        await connection.execute(
-            'DELETE ci FROM cart_items ci JOIN carts cart ON cart.id = ci.cart_id WHERE ci.id = ? AND cart.user_id = ?', [itemId, userId]);
-    });
+    const user = await User.findById(userId);
+    if (!user) throw new Error('USER_NOT_FOUND');
+
+    const item = user.cart_items.id(itemId);
+    if (!item) throw new Error('CART_ITEM_NOT_FOUND');
+
+    item.deleteOne();
+    await user.save();
 };
 
 module.exports = { getCart, addCartItem, updateCartItem, removeCartItem };

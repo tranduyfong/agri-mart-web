@@ -1,6 +1,6 @@
 // 1 chương trình khuyến mãi đang diễn ra (GET /api/promotion/active)
 export interface Promotion {
-  id: number;
+  id: string;
   code: string;
   name: string;
   discount_value: number;

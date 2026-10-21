@@ -41,12 +41,14 @@ export interface LoginResponseData {
 
 // Thông tin người dùng trả về từ API đăng nhập của back-end
 export interface AuthUser {
-  id: number;
+  id: string;
   full_name: string;
   email: string;
   phone: string | null;
   status: 'ACTIVE' | 'LOCKED' | 'PENDING';
-  avatar_file_id: number | null;
+  avatar_url: string | null;
+  role: 'ADMIN' | 'STAFF' | 'CUSTOMER';
+  permissions: string[];
   role_code: 'ADMIN' | 'STAFF' | 'CUSTOMER';
   created_at: string;
 }

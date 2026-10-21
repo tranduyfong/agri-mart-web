@@ -11,13 +11,13 @@ import { canSelectCartItem, getCartItemPrice } from '../../utils/shopping';
 
 const CartSection = () => {
   const cart = useAppSelector((state) => state.shopping.cart);
-  const [excludedIds, setExcludedIds] = useState<number[]>([]);
+  const [excludedIds, setExcludedIds] = useState<string[]>([]);
   const availableItems = cart.filter(canSelectCartItem);
   const selectedItems = availableItems.filter((item) => !excludedIds.includes(item.id));
   const total = selectedItems.reduce((sum, item) => sum + getCartItemPrice(item) * item.quantity, 0);
   const allSelected = availableItems.length > 0 && selectedItems.length === availableItems.length;
 
-  const selectItem = (id: number, checked: boolean) => {
+  const selectItem = (id: string, checked: boolean) => {
     setExcludedIds((ids) => checked ? ids.filter((item) => item !== id) : [...ids, id]);
   };
 

@@ -1,498 +1,406 @@
-const db = require('../configs/database.config');
+const mongoose = require('mongoose');
 const slugify = require('slugify');
-const dayjs = require('dayjs');
+const Product = require('../models/product');
+const Category = require('../models/category');
+const Branch = require('../models/branch');
+const Supplier = require('../models/supplier');
+const Promotion = require('../models/promotion');
+const Order = require('../models/order');
+const GoodsReceipt = require('../models/goodsReceipt');
+const { normalizeSearch } = require('../utils/string.util');
+const { getToday, parseDate } = require('../utils/date.util');
+const { availableStock } = require('../utils/productStock.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
 
-// Tạo slug từ tên + mã sản phẩm (mã là duy nhất nên slug cũng không bị trùng)
-// locale 'vi' để chuyển đúng chữ "Đ" thành "d" (mặc định slugify đổi thành "dj")
-const createSlug = (name, code) => slugify(`${name} ${code}`, { lower: true, strict: true, locale: 'vi' });
-
-// Các kiểu sắp xếp cho phép. Chỉ lấy câu ORDER BY từ đây, không ghép trực tiếp giá trị client gửi lên (tránh SQL Injection)
-const SORT_OPTIONS = {
-    newest: 'p.created_at DESC, p.id DESC',
-    price_asc: 'min_price ASC, p.id DESC',
-    price_desc: 'min_price DESC, p.id DESC',
-    name_asc: 'p.name ASC, p.id DESC',
-    best_selling: 'sold_quantity DESC, p.id DESC', // Bán chạy nhất (từ trước tới nay)
-    trending: 'sold_last_30_days DESC, sold_quantity DESC, p.id DESC' // Xu hướng (bán nhiều trong 30 ngày gần đây)
+const createSlug = (name, code) => {
+    return slugify(name + ' ' + code, { lower: true, strict: true, locale: 'vi' });
 };
 
-// Điều kiện "khuyến mãi đang diễn ra" (bảng promotions đặt tên là pr)
-const ACTIVE_PROMOTION_CONDITION = 'pr.valid_from <= NOW() AND pr.valid_to >= NOW()';
+const getProductDiscounts = async (productIds) => {
+    const now = new Date();
+    const promotions = await Promotion.find({
+        valid_from: { $lte: now },
+        valid_to: { $gte: now },
+        discount_type: 'PERCENT',
+        product_ids: { $in: productIds }
+    });
 
-// Lưu ảnh sản phẩm: bảng files -> lấy file_id -> bảng product_images
-const insertProductImages = async (connection, productId, uploadedFiles, userId) => {
-    for (const file of uploadedFiles) {
-        // Đổi đường dẫn dấu \ thành / cho chuẩn URL web
-        const fileUrl = file.path.replace(/\\/g, '/');
-
-        const [fileRes] = await connection.execute(
-            `INSERT INTO files (owner_id, file_name, mime_type, url) VALUES (?, ?, ?, ?)`,
-            [userId, file.originalname, file.mimetype, fileUrl]
-        );
-
-        await connection.execute(
-            `INSERT INTO product_images (product_id, file_id, is_thumbnail) VALUES (?, ?, 0)`,
-            [productId, fileRes.insertId]
-        );
+    const discounts = {};
+    for (const promotion of promotions) {
+        for (const productId of promotion.product_ids) {
+            const id = productId.toString();
+            discounts[id] = Math.max(discounts[id] || 0, promotion.discount_value);
+        }
     }
+
+    return discounts;
 };
 
-// Nếu sản phẩm chưa có ảnh đại diện (thumbnail) thì lấy ảnh cũ nhất làm thumbnail
-const ensureThumbnail = async (connection, productId) => {
-    const [thumbnails] = await connection.execute(
-        'SELECT id FROM product_images WHERE product_id = ? AND is_thumbnail = 1',
-        [productId]
-    );
-
-    if (thumbnails.length === 0) {
-        await connection.execute(
-            'UPDATE product_images SET is_thumbnail = 1 WHERE product_id = ? ORDER BY id LIMIT 1',
-            [productId]
-        );
-    }
-};
-
-/**
- * Lấy danh sách sản phẩm có tìm kiếm, bộ lọc và phân trang
- * filters: { keyword, category_id, min_price, max_price, status, on_sale, sort }
- * pagination: { pageSize, offset }
- */
 const getProducts = async (filters, pagination) => {
-    const { keyword, category_id, min_price, max_price, status, on_sale, sort, wishlist_user_id } = filters;
+    const query = {};
+    if (filters.status) query.status = filters.status;
+    if (filters.category_id) {
+        if (!mongoose.isObjectIdOrHexString(filters.category_id)) return { products: [], totalElements: 0 };
+        query.category_id = filters.category_id;
+    }
+    if (filters.product_ids) query._id = { $in: filters.product_ids };
 
-    // Ghép điều kiện WHERE theo từng bộ lọc.
-    // Muốn thêm bộ lọc mới (VD: lọc theo chi nhánh còn hàng) chỉ cần thêm 1 khối if giống bên dưới
-    const conditions = [];
-    const params = [];
-
-    // Bộ lọc nội bộ từ wishlistService, không nhận user_id từ query của khách hàng
-    if (wishlist_user_id) {
-        conditions.push('EXISTS (SELECT 1 FROM wishlist_items wi WHERE wi.product_id = p.id AND wi.user_id = ?)');
-        params.push(wishlist_user_id);
+    // Khoảng giá phải khớp trong cùng một quy cách bán.
+    if (filters.min_price != null || filters.max_price != null) {
+        const price = {};
+        if (filters.min_price != null) price.$gte = filters.min_price;
+        if (filters.max_price != null) price.$lte = filters.max_price;
+        query.variants = { $elemMatch: { list_price: price } };
     }
 
-    if (status) {
-        conditions.push('p.status = ?');
-        params.push(status);
+    let products = await Product.find(query).populate('category_id', 'name').lean();
+    if (filters.keyword) {
+        const keyword = normalizeSearch(filters.keyword);
+        products = products.filter((product) => normalizeSearch(product.name + ' ' + product.code).includes(keyword));
     }
 
-    if (keyword) {
-        conditions.push('(p.name LIKE ? OR p.code LIKE ?)');
-        params.push(`%${keyword}%`, `%${keyword}%`);
-    }
+    const productIds = products.map((product) => product._id);
+    const now = new Date();
+    const recentDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [promotions, orders] = await Promise.all([
+        Promotion.find({ valid_from: { $lte: now }, valid_to: { $gte: now }, product_ids: { $in: productIds } }).lean(),
+        Order.find({ status: 'COMPLETED', 'items.product_id': { $in: productIds } })
+            .select('items created_at')
+            .lean()
+    ]);
 
-    if (category_id) {
-        conditions.push('p.category_id = ?');
-        params.push(category_id);
-    }
-
-    // Lọc theo giá: sản phẩm có ít nhất 1 quy cách nằm trong khoảng giá
-    if (min_price !== null || max_price !== null) {
-        let priceCondition = 'v.product_id = p.id';
-        if (min_price !== null) {
-            priceCondition += ' AND v.list_price >= ?';
-            params.push(min_price);
+    const sales = {};
+    for (const order of orders) {
+        for (const item of order.items) {
+            const id = item.product_id.toString();
+            if (!sales[id]) sales[id] = { total: 0, recent: 0 };
+            sales[id].total += item.quantity;
+            if (order.created_at >= recentDate) sales[id].recent += item.quantity;
         }
-        if (max_price !== null) {
-            priceCondition += ' AND v.list_price <= ?';
-            params.push(max_price);
-        }
-        conditions.push(`EXISTS (SELECT 1 FROM product_variants v WHERE ${priceCondition})`);
     }
 
-    // Chỉ lấy sản phẩm đang nằm trong 1 chương trình khuyến mãi còn hiệu lực
-    if (on_sale) {
-        conditions.push(`EXISTS (SELECT 1 FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
-                                 WHERE pp.product_id = p.id AND ${ACTIVE_PROMOTION_CONDITION})`);
+    const result = [];
+    for (const product of products) {
+        const id = product._id.toString();
+        const offers = promotions.filter((promotion) => promotion.product_ids.some((value) => value.toString() === id));
+        if (filters.on_sale && !offers.length) continue;
+
+        const variants = [...product.variants].sort((a, b) => a.list_price - b.list_price);
+        const percentOffers = offers.filter((promotion) => promotion.discount_type === 'PERCENT');
+        const stock = variants.reduce((total, variant) => total + availableStock(variant), 0);
+
+        result.push({
+            id,
+            code: product.code,
+            name: product.name,
+            slug: product.slug,
+            status: product.status,
+            created_at: product.created_at,
+            category_id: product.category_id?._id.toString() || null,
+            category_name: product.category_id?.name || null,
+            min_price: variants[0]?.list_price ?? null,
+            max_price: variants[variants.length - 1]?.list_price ?? null,
+            unit: variants[0]?.unit || null,
+            total_stock: Math.round(stock * 1000) / 1000,
+            thumbnail_url: product.images[0] || null,
+            sold_quantity: sales[id]?.total || 0,
+            sold_last_30_days: sales[id]?.recent || 0,
+            discount_percent: percentOffers.length ? Math.max(...percentOffers.map((offer) => offer.discount_value)) : null
+        });
     }
 
-    const whereSql = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
-
-    // 1. Đếm tổng số sản phẩm thỏa điều kiện (để tính totalPages)
-    const [countRows] = await db.execute(`SELECT COUNT(*) AS total FROM products p ${whereSql}`, params);
-
-    // 2. Lấy dữ liệu của trang hiện tại
-    // Lưu ý: LIMIT/OFFSET phải truyền dạng chuỗi, mysql2 truyền số sẽ bị lỗi "Incorrect arguments to mysqld_stmt_execute"
-    const [products] = await db.execute(
-        `SELECT p.id, p.code, p.name, p.slug, p.status, p.created_at,
-                p.category_id, c.name AS category_name,
-                (SELECT MIN(v.list_price) FROM product_variants v WHERE v.product_id = p.id) AS min_price,
-                (SELECT MAX(v.list_price) FROM product_variants v WHERE v.product_id = p.id) AS max_price,
-                (SELECT v.unit FROM product_variants v WHERE v.product_id = p.id ORDER BY v.list_price LIMIT 1) AS unit,
-                (SELECT COALESCE(SUM(bs.stock_quantity), 0)
-                   FROM branch_stock bs JOIN product_variants v ON v.id = bs.variant_id
-                  WHERE v.product_id = p.id AND bs.expiry_date >= CURDATE()) AS total_stock,
-                (SELECT f.url
-                   FROM product_images pi JOIN files f ON f.id = pi.file_id
-                  WHERE pi.product_id = p.id AND pi.is_thumbnail = 1 LIMIT 1) AS thumbnail_url,
-                (SELECT COALESCE(SUM(oi.quantity), 0)
-                   FROM order_items oi
-                   JOIN orders o ON o.id = oi.order_id
-                   JOIN product_variants v ON v.id = oi.variant_id
-                  WHERE v.product_id = p.id AND o.status = 'COMPLETED') AS sold_quantity,
-                (SELECT COALESCE(SUM(oi.quantity), 0)
-                   FROM order_items oi
-                   JOIN orders o ON o.id = oi.order_id
-                   JOIN product_variants v ON v.id = oi.variant_id
-                  WHERE v.product_id = p.id AND o.status = 'COMPLETED'
-                    AND o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS sold_last_30_days,
-                (SELECT MAX(pr.discount_value)
-                   FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
-                  WHERE pp.product_id = p.id AND pr.discount_type = 'PERCENT' AND ${ACTIVE_PROMOTION_CONDITION}) AS discount_percent
-         FROM products p
-         JOIN categories c ON c.id = p.category_id
-         ${whereSql}
-         ORDER BY ${SORT_OPTIONS[sort] || SORT_OPTIONS.newest}
-         LIMIT ? OFFSET ?`,
-        [...params, String(pagination.pageSize), String(pagination.offset)]
-    );
+    result.sort((a, b) => {
+        if (filters.sort === 'price_asc') return a.min_price - b.min_price || b.id.localeCompare(a.id);
+        if (filters.sort === 'price_desc') return b.min_price - a.min_price || b.id.localeCompare(a.id);
+        if (filters.sort === 'name_asc') return a.name.localeCompare(b.name, 'vi') || b.id.localeCompare(a.id);
+        if (filters.sort === 'best_selling') return b.sold_quantity - a.sold_quantity || b.id.localeCompare(a.id);
+        if (filters.sort === 'trending')
+            return b.sold_last_30_days - a.sold_last_30_days || b.sold_quantity - a.sold_quantity || b.id.localeCompare(a.id);
+        return b.created_at - a.created_at || b.id.localeCompare(a.id);
+    });
 
     return {
-        products,
-        totalElements: countRows[0].total
+        products: result.slice(pagination.offset, pagination.offset + pagination.pageSize),
+        totalElements: result.length
     };
 };
 
-/**
- * Lấy chi tiết 1 sản phẩm theo id (nhân viên) hoặc slug (khách hàng)
- * onlyPublished = true: chỉ lấy sản phẩm đang bán
- */
 const getProductDetail = async ({ id, slug, onlyPublished }) => {
-    let sql = `SELECT p.id, p.code, p.name, p.slug, p.description, p.status, p.created_at,
-                      p.category_id, c.name AS category_name,
-                      (SELECT MAX(pr.discount_value)
-                         FROM promotion_products pp JOIN promotions pr ON pr.id = pp.promotion_id
-                        WHERE pp.product_id = p.id AND pr.discount_type = 'PERCENT'
-                          AND ${ACTIVE_PROMOTION_CONDITION}) AS discount_percent
-               FROM products p
-               JOIN categories c ON c.id = p.category_id
-               WHERE ${id ? 'p.id = ?' : 'p.slug = ?'}`;
+    if (id !== undefined && !mongoose.isObjectIdOrHexString(id)) throw new Error('PRODUCT_NOT_FOUND');
 
-    if (onlyPublished) {
-        sql += ` AND p.status = 'PUBLISHED'`;
-    }
+    const query = id !== undefined ? { _id: id } : { slug };
+    if (onlyPublished) query.status = 'PUBLISHED';
 
-    const [products] = await db.execute(sql, [id || slug]);
-    if (products.length === 0) throw new Error('PRODUCT_NOT_FOUND');
+    const product = await Product.findOne(query).populate('category_id', 'name');
+    if (!product) throw new Error('PRODUCT_NOT_FOUND');
 
-    const product = products[0];
+    const discounts = await getProductDiscounts([product._id]);
 
-    // Các quy cách kèm tồn kho (chỉ tính các lô còn hạn sử dụng, cộng tất cả chi nhánh)
-    const [variants] = await db.execute(
-        `SELECT v.id, v.sku, v.name, v.unit, v.step_quantity, v.list_price,
-                (SELECT COALESCE(SUM(bs.stock_quantity), 0) FROM branch_stock bs
-                  WHERE bs.variant_id = v.id AND bs.expiry_date >= CURDATE()) AS stock_quantity
-         FROM product_variants v
-         WHERE v.product_id = ?
-         ORDER BY v.id`,
-        [product.id]
-    );
-
-    // Ảnh sản phẩm, thumbnail đứng đầu
-    const [images] = await db.execute(
-        `SELECT pi.id, f.url, pi.is_thumbnail
-         FROM product_images pi JOIN files f ON f.id = pi.file_id
-         WHERE pi.product_id = ?
-         ORDER BY pi.is_thumbnail DESC, pi.id`,
-        [product.id]
-    );
-
-    product.variants = variants;
-    product.images = images;
-    return product;
+    return {
+        id: product._id.toString(),
+        code: product.code,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        status: product.status,
+        created_at: product.created_at,
+        category_id: product.category_id?._id.toString() || null,
+        category_name: product.category_id?.name || null,
+        discount_percent: discounts[product._id.toString()] ?? null,
+        variants: product.variants.map((variant) => ({
+            id: variant._id.toString(),
+            sku: variant.sku,
+            name: variant.name,
+            unit: variant.unit,
+            step_quantity: variant.step_quantity,
+            list_price: variant.list_price,
+            stock_quantity: availableStock(variant)
+        })),
+        images: product.images.map((url, index) => ({ id: url, url, is_thumbnail: index === 0 ? 1 : 0 }))
+    };
 };
 
-const createProduct = async (productData) => {
-    const { category_id, code, name, description, status, variants, uploaded_files, user_id } = productData;
-    const slug = createSlug(name, code);
+const getVariantData = (variant) => {
+    return {
+        sku: variant.sku,
+        name: variant.variant_name,
+        unit: variant.unit || 'kg',
+        step_quantity: variant.step_quantity ?? 1,
+        list_price: variant.list_price
+    };
+};
 
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
+const checkVariants = (product) => {
+    if (product.status === 'PUBLISHED' && !product.variants.length) throw new Error('PRODUCT_HAS_NO_VARIANT');
 
-    try {
-        // 0. Kiểm tra danh mục có tồn tại không
-        const [categories] = await connection.execute('SELECT id FROM categories WHERE id = ?', [category_id]);
-        if (categories.length === 0) throw new Error('CATEGORY_NOT_FOUND');
-
-        // 1. Insert bảng products
-        const [prodResult] = await connection.execute(
-            `INSERT INTO products (category_id, code, name, slug, description, status) VALUES (?, ?, ?, ?, ?, ?)`,
-            [category_id, code, name, slug, description || null, status || 'DRAFT']
-        );
-        const productId = prodResult.insertId;
-
-        // 2. Insert các variants (SKU), đơn vị và bước nhảy không nhập thì lấy mặc định
-        for (const v of variants) {
-            await connection.execute(
-                `INSERT INTO product_variants (product_id, sku, name, unit, step_quantity, list_price) VALUES (?, ?, ?, ?, ?, ?)`,
-                [productId, v.sku, v.variant_name, v.unit || 'kg', v.step_quantity || 1, v.list_price]
-            );
-        }
-
-        // 3. Lưu ảnh, ảnh đầu tiên là thumbnail
-        await insertProductImages(connection, productId, uploaded_files, user_id);
-        await ensureThumbnail(connection, productId);
-
-        await connection.commit();
-        return { productId, slug };
-    } catch (error) {
-        // Ảnh đã upload sẽ được controller xóa khi có lỗi
-        await connection.rollback();
+    const skus = product.variants.map((variant) => variant.sku);
+    if (new Set(skus).size !== skus.length) {
+        const error = new Error('DUPLICATE_SKU');
+        error.code = 11000;
         throw error;
-    } finally {
-        connection.release();
     }
 };
 
-/**
- * Chỉnh sửa sản phẩm. Chỉ cập nhật những trường được gửi lên (trường nào undefined thì giữ nguyên)
- * - variants: quy cách có id -> sửa, không có id -> thêm mới
- * - delete_image_ids: danh sách id ảnh (product_images.id) cần xóa
- * - uploaded_files: ảnh mới được thêm vào
- */
-const updateProduct = async (productData) => {
-    const { id, code, name, description, category_id, status, variants, delete_image_ids, uploaded_files, user_id } = productData;
+const addImages = (product, data) => {
+    const urls = data.image_urls || [];
+    if (!Array.isArray(urls) || urls.some((url) => typeof url !== 'string' || !/^https?:\/\//.test(url))) {
+        throw new Error('INVALID_PRODUCT_DATA');
+    }
 
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
+    const uploads = (data.uploaded_files || []).map((file) => file.path.replace(/\\/g, '/'));
+    product.images = [...new Set([...product.images, ...uploads, ...urls])];
+};
 
-    const deletedFiles = []; // Ảnh cũ cần xóa khỏi ổ cứng sau khi lưu DB thành công
+const createProduct = async (data) => {
+    if (!mongoose.isObjectIdOrHexString(data.category_id) || !(await Category.exists({ _id: data.category_id }))) {
+        throw new Error('CATEGORY_NOT_FOUND');
+    }
+    if (data.variants !== undefined && !Array.isArray(data.variants)) throw new Error('INVALID_PRODUCT_DATA');
 
-    try {
-        // 1. Kiểm tra sản phẩm và danh mục có tồn tại không
-        const [products] = await connection.execute('SELECT id, code, name FROM products WHERE id = ?', [id]);
-        if (products.length === 0) throw new Error('PRODUCT_NOT_FOUND');
-        const currentProduct = products[0];
+    const product = new Product({
+        category_id: data.category_id,
+        code: data.code,
+        name: data.name,
+        slug: createSlug(data.name, data.code),
+        description: data.description || '',
+        status: data.status || 'DRAFT',
+        variants: (data.variants || []).map(getVariantData)
+    });
 
-        if (category_id !== undefined) {
-            const [categories] = await connection.execute('SELECT id FROM categories WHERE id = ?', [category_id]);
-            if (categories.length === 0) throw new Error('CATEGORY_NOT_FOUND');
+    checkVariants(product);
+    addImages(product, data);
+    await product.save();
+
+    return { productId: product._id.toString(), slug: product.slug };
+};
+
+const updateProduct = async (data) => {
+    if (!mongoose.isObjectIdOrHexString(data.id)) throw new Error('PRODUCT_NOT_FOUND');
+    const product = await Product.findById(data.id);
+    if (!product) throw new Error('PRODUCT_NOT_FOUND');
+
+    if (
+        data.category_id !== undefined &&
+        (!mongoose.isObjectIdOrHexString(data.category_id) || !(await Category.exists({ _id: data.category_id })))
+    ) {
+        throw new Error('CATEGORY_NOT_FOUND');
+    }
+
+    for (const field of ['code', 'name', 'description', 'category_id', 'status']) {
+        if (data[field] !== undefined) product[field] = data[field];
+    }
+    if (data.code !== undefined || data.name !== undefined) product.slug = createSlug(product.name, product.code);
+
+    if (data.variants !== undefined && !Array.isArray(data.variants)) throw new Error('INVALID_PRODUCT_DATA');
+    for (const variant of data.variants || []) {
+        if (variant.id) {
+            const current = product.variants.id(variant.id);
+            if (!current) throw new Error('VARIANT_NOT_FOUND');
+            Object.assign(current, getVariantData(variant));
+        } else {
+            product.variants.push(getVariantData(variant));
+        }
+    }
+
+    const removedImages = data.delete_image_urls ?? data.delete_image_ids ?? [];
+    if (!Array.isArray(removedImages)) throw new Error('INVALID_PRODUCT_DATA');
+    if (removedImages.some((url) => !product.images.includes(url))) throw new Error('IMAGE_NOT_FOUND');
+
+    product.images = product.images.filter((url) => !removedImages.includes(url));
+    checkVariants(product);
+    addImages(product, data);
+    await product.save();
+
+    // Chỉ xóa ảnh nội bộ sau khi cập nhật thành công và ảnh không còn được dùng.
+    for (const url of removedImages) {
+        if (/^uploads\/(?!.*\.\.)/.test(url) && !(await Product.exists({ images: url }))) {
+            deleteUploadedFiles([{ path: url }]);
+        }
+    }
+
+    return getProductDetail({ id: data.id });
+};
+
+const validateImportRows = async (items, session) => {
+    const errors = [];
+    const newSkus = new Set();
+
+    for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        const row = index + 1;
+        if (
+            !item ||
+            typeof item.sku !== 'string' ||
+            !item.sku.trim() ||
+            !Number.isFinite(item.quantity) ||
+            item.quantity <= 0 ||
+            !Number.isFinite(item.unit_cost) ||
+            item.unit_cost < 0 ||
+            Math.abs(item.quantity * 1000 - Math.round(item.quantity * 1000)) > 0.00001 ||
+            !parseDate(item.expiry_date) ||
+            (item.manufactured_date && !parseDate(item.manufactured_date)) ||
+            (item.manufactured_date && item.manufactured_date > item.expiry_date)
+        ) {
+            errors.push({ row, message: 'SKU, số lượng, đơn giá hoặc ngày sản xuất/hạn sử dụng không hợp lệ' });
+            continue;
         }
 
-        // 2. Cập nhật thông tin chung (chỉ những trường được gửi lên)
-        const fields = [];
-        const params = [];
+        if (newSkus.has(item.sku) || (await Product.exists({ 'variants.sku': item.sku }).session(session))) continue;
 
-        if (code !== undefined) {
-            fields.push('code = ?');
-            params.push(code);
+        if (
+            !item.code ||
+            !item.name ||
+            !item.variant_name ||
+            !mongoose.isObjectIdOrHexString(item.category_id) ||
+            !Number.isFinite(item.list_price) ||
+            item.list_price < 0 ||
+            (item.step_quantity != null && (!Number.isFinite(item.step_quantity) || item.step_quantity < 0.001))
+        ) {
+            errors.push({ row, message: 'SKU mới cần Mã SP, Tên SP, Danh mục, Quy cách, Giá niêm yết và bước bán hợp lệ' });
+        } else if (!(await Category.exists({ _id: item.category_id }).session(session))) {
+            errors.push({ row, message: 'Danh mục không tồn tại' });
+        } else {
+            newSkus.add(item.sku);
         }
-        if (name !== undefined) {
-            fields.push('name = ?');
-            params.push(name);
-        }
-        if (description !== undefined) {
-            fields.push('description = ?');
-            params.push(description || null);
-        }
-        if (category_id !== undefined) {
-            fields.push('category_id = ?');
-            params.push(category_id);
-        }
-        if (status !== undefined) {
-            fields.push('status = ?');
-            params.push(status);
-        }
-        // Đổi tên hoặc mã thì tạo lại slug cho khớp
-        if (code !== undefined || name !== undefined) {
-            fields.push('slug = ?');
-            params.push(createSlug(name || currentProduct.name, code || currentProduct.code));
-        }
+    }
 
-        if (fields.length > 0) {
-            params.push(id);
-            await connection.execute(`UPDATE products SET ${fields.join(', ')} WHERE id = ?`, params);
-        }
-
-        // 3. Cập nhật quy cách (variants)
-        if (variants) {
-            for (const v of variants) {
-                if (v.id) {
-                    // Quy cách phải thuộc đúng sản phẩm đang sửa
-                    const [rows] = await connection.execute(
-                        'SELECT id FROM product_variants WHERE id = ? AND product_id = ?',
-                        [v.id, id]
-                    );
-                    if (rows.length === 0) throw new Error('VARIANT_NOT_FOUND');
-
-                    await connection.execute(
-                        `UPDATE product_variants SET sku = ?, name = ?, unit = ?, step_quantity = ?, list_price = ? WHERE id = ?`,
-                        [v.sku, v.variant_name, v.unit || 'kg', v.step_quantity || 1, v.list_price, v.id]
-                    );
-                } else {
-                    await connection.execute(
-                        `INSERT INTO product_variants (product_id, sku, name, unit, step_quantity, list_price) VALUES (?, ?, ?, ?, ?, ?)`,
-                        [id, v.sku, v.variant_name, v.unit || 'kg', v.step_quantity || 1, v.list_price]
-                    );
-                }
-            }
-        }
-
-        // 4. Muốn công bố bán thì sản phẩm phải có ít nhất 1 quy cách (để có giá bán)
-        if (status === 'PUBLISHED') {
-            const [variantRows] = await connection.execute('SELECT id FROM product_variants WHERE product_id = ?', [id]);
-            if (variantRows.length === 0) throw new Error('PRODUCT_HAS_NO_VARIANT');
-        }
-
-        // 5. Xóa ảnh cũ (xóa bản ghi bảng files thì product_images tự xóa theo nhờ ON DELETE CASCADE)
-        if (delete_image_ids) {
-            for (const imageId of delete_image_ids) {
-                const [images] = await connection.execute(
-                    `SELECT pi.file_id, f.url FROM product_images pi JOIN files f ON f.id = pi.file_id
-                     WHERE pi.id = ? AND pi.product_id = ?`,
-                    [imageId, id]
-                );
-                if (images.length === 0) throw new Error('IMAGE_NOT_FOUND');
-
-                await connection.execute('DELETE FROM files WHERE id = ?', [images[0].file_id]);
-                deletedFiles.push({ path: images[0].url });
-            }
-        }
-
-        // 6. Thêm ảnh mới, nếu ảnh thumbnail bị xóa thì chọn lại thumbnail
-        await insertProductImages(connection, id, uploaded_files, user_id);
-        await ensureThumbnail(connection, id);
-
-        await connection.commit();
-    } catch (error) {
-        await connection.rollback();
+    if (errors.length) {
+        const error = new Error('INVALID_ROWS');
+        error.rows = errors;
         throw error;
-    } finally {
-        connection.release();
     }
-
-    // Lưu DB thành công mới xóa file ảnh cũ trên ổ cứng
-    deleteUploadedFiles(deletedFiles);
-
-    return getProductDetail({ id });
 };
 
-/**
- * Nhập hàng (tất cả trong 1 transaction, lỗi 1 dòng thì hủy cả phiếu nhập)
- * FE đọc file Excel, hiển thị bảng xem trước rồi gửi danh sách items dạng JSON lên
- * - SKU chưa có trong hệ thống -> tạo sản phẩm (nếu chưa có) + tạo SKU mới
- * - SKU đã có -> giữ nguyên thông tin sản phẩm, chỉ cộng thêm số lượng tồn kho
- * - Mỗi lần nhập tạo 1 phiếu nhập (goods_receipts) để lưu lịch sử
- */
-const importGoods = async (importData) => {
-    const { items, branch_id, supplier_id, note, user_id } = importData;
+const importGoods = async (data) => {
+    const { items, branch_id, supplier_id, note, user_id } = data;
+    if (!mongoose.isObjectIdOrHexString(branch_id) || !(await Branch.exists({ _id: branch_id }))) throw new Error('BRANCH_NOT_FOUND');
+    if (supplier_id && (!mongoose.isObjectIdOrHexString(supplier_id) || !(await Supplier.exists({ _id: supplier_id }))))
+        throw new Error('SUPPLIER_NOT_FOUND');
+    if (!Array.isArray(items) || !items.length) throw new Error('INVALID_PRODUCT_DATA');
 
-    // Không nhập mã lô thì lấy theo ngày nhập hàng, VD: LO-20261012
-    const defaultBatchCode = 'LO-' + dayjs().format('YYYYMMDD');
-
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    try {
-        const [branches] = await connection.execute('SELECT id FROM branches WHERE id = ?', [branch_id]);
-        if (branches.length === 0) throw new Error('BRANCH_NOT_FOUND');
-
-        // Bước 1: Kiểm tra các dòng có SKU mới phải đủ thông tin để tạo sản phẩm
-        // (FE không biết SKU nào đã có trong DB nên phần này phải kiểm tra ở BE)
-        const errors = [];
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            const rowNumber = i + 1; // Số thứ tự dòng trong bảng FE gửi lên
-
-            const [variants] = await connection.execute('SELECT id FROM product_variants WHERE sku = ?', [item.sku]);
-            if (variants.length > 0) continue; // SKU đã có -> chỉ cộng tồn kho, không cần kiểm tra thêm
-
-            if (!item.code || !item.name || !item.category_id || !item.variant_name || item.list_price === undefined || item.list_price === null) {
-                errors.push({ row: rowNumber, message: `SKU ${item.sku} chưa có trong hệ thống, cần nhập đủ Mã SP, Tên SP, Danh mục, Quy cách và Giá niêm yết` });
-                continue;
-            }
-
-            const [categories] = await connection.execute('SELECT id FROM categories WHERE id = ?', [item.category_id]);
-            if (categories.length === 0) {
-                errors.push({ row: rowNumber, message: `Danh mục ${item.category_id} không tồn tại` });
-            }
-        }
-
-        if (errors.length > 0) {
-            const error = new Error('INVALID_ROWS');
-            error.rows = errors;
-            throw error;
-        }
-
-        // Bước 2: Tạo phiếu nhập hàng
-        const [receiptRes] = await connection.execute(
-            `INSERT INTO goods_receipts (branch_id, supplier_id, created_by, note) VALUES (?, ?, ?, ?)`,
-            [branch_id, supplier_id || null, user_id, note || null]
-        );
-        const receiptId = receiptRes.insertId;
-
+    // Phiếu nhập và các lô hàng phải được lưu cùng nhau: có lỗi thì hủy toàn bộ.
+    return mongoose.connection.transaction(async (session) => {
+        await validateImportRows(items, session);
+        const receipt = new GoodsReceipt({
+            branch_id,
+            supplier_id: supplier_id || null,
+            created_by: user_id,
+            note: note || ''
+        });
         let createdProducts = 0;
         let createdVariants = 0;
-        let totalAmount = 0;
 
-        // Bước 3: Xử lý từng dòng
         for (const item of items) {
-            const [variants] = await connection.execute('SELECT id FROM product_variants WHERE sku = ?', [item.sku]);
-            let variantId;
+            let product = await Product.findOne({ 'variants.sku': item.sku }).session(session);
+            let variant = product?.variants.find((entry) => entry.sku === item.sku);
 
-            if (variants.length > 0) {
-                variantId = variants[0].id;
-            } else {
-                // SKU mới: tìm sản phẩm theo mã, chưa có thì tạo sản phẩm mới
-                const [products] = await connection.execute('SELECT id FROM products WHERE code = ?', [item.code]);
-                let productId;
-
-                if (products.length > 0) {
-                    productId = products[0].id;
-                } else {
-                    const [pRes] = await connection.execute(
-                        `INSERT INTO products (category_id, code, name, slug, description, status) VALUES (?, ?, ?, ?, ?, 'PUBLISHED')`,
-                        [item.category_id, item.code, item.name, createSlug(item.name, item.code), item.description || null]
-                    );
-                    productId = pRes.insertId;
+            if (!variant) {
+                product = await Product.findOne({ code: item.code }).session(session);
+                if (!product) {
+                    product = new Product({
+                        category_id: item.category_id,
+                        code: item.code,
+                        name: item.name,
+                        slug: createSlug(item.name, item.code),
+                        description: item.description || '',
+                        status: 'PUBLISHED'
+                    });
                     createdProducts++;
                 }
 
-                const [vRes] = await connection.execute(
-                    `INSERT INTO product_variants (product_id, sku, name, unit, step_quantity, list_price) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [productId, item.sku, item.variant_name, item.unit || 'kg', item.step_quantity || 1, item.list_price]
-                );
-                variantId = vRes.insertId;
+                product.variants.push(getVariantData(item));
+                variant = product.variants[product.variants.length - 1];
                 createdVariants++;
             }
 
-            const batchCode = item.batch_code || defaultBatchCode;
+            const batchCode = item.batch_code || 'LO-' + getToday().replace(/-/g, '');
+            let stock = variant.stocks.find((lot) => lot.branch_id.toString() === branch_id.toString() && lot.batch_code === batchCode);
 
-            // Lưu chi tiết phiếu nhập
-            await connection.execute(
-                `INSERT INTO goods_receipt_items (receipt_id, variant_id, batch_code, quantity, unit_cost, manufactured_date, expiry_date)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [receiptId, variantId, batchCode, item.quantity, item.unit_cost, item.manufactured_date || null, item.expiry_date]
-            );
+            if (stock) {
+                if (
+                    stock.expiry_date.getTime() !== parseDate(item.expiry_date).getTime() ||
+                    (stock.manufactured_date?.getTime() || null) !== (parseDate(item.manufactured_date)?.getTime() || null)
+                ) {
+                    const error = new Error('INVALID_ROWS');
+                    error.rows = [{ row: items.indexOf(item) + 1, message: 'Mã lô đã tồn tại với ngày sản xuất hoặc hạn sử dụng khác' }];
+                    throw error;
+                }
+                stock.quantity = Math.round((stock.quantity + item.quantity) * 1000) / 1000;
+            } else {
+                variant.stocks.push({
+                    branch_id,
+                    batch_code: batchCode,
+                    quantity: item.quantity,
+                    manufactured_date: parseDate(item.manufactured_date),
+                    expiry_date: parseDate(item.expiry_date)
+                });
+            }
 
-            // Cộng tồn kho: chưa có lô này ở chi nhánh thì thêm mới, có rồi thì cộng dồn số lượng
-            await connection.execute(
-                `INSERT INTO branch_stock (branch_id, variant_id, batch_code, expiry_date, stock_quantity)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE stock_quantity = stock_quantity + ?`,
-                [branch_id, variantId, batchCode, item.expiry_date, item.quantity, item.quantity]
-            );
-
-            totalAmount += item.quantity * item.unit_cost;
+            checkVariants(product);
+            await product.save({ session });
+            receipt.items.push({
+                product_id: product._id,
+                variant_sku: variant.sku,
+                batch_code: batchCode,
+                quantity: item.quantity,
+                unit_cost: item.unit_cost,
+                manufactured_date: parseDate(item.manufactured_date),
+                expiry_date: parseDate(item.expiry_date)
+            });
+            receipt.total_amount += item.quantity * item.unit_cost;
         }
 
-        await connection.execute('UPDATE goods_receipts SET total_amount = ? WHERE id = ?', [totalAmount, receiptId]);
+        receipt.total_amount = Math.round(receipt.total_amount * 100) / 100;
+        await receipt.save({ session });
 
-        await connection.commit();
         return {
-            receipt_id: receiptId,
+            receipt_id: receipt._id.toString(),
             total_rows: items.length,
             created_products: createdProducts,
             created_variants: createdVariants,
-            total_amount: totalAmount
+            total_amount: receipt.total_amount
         };
-    } catch (error) {
-        await connection.rollback();
-        throw error;
-    } finally {
-        connection.release();
-    }
+    });
 };
 
-module.exports = { getProducts, getProductDetail, createProduct, updateProduct, importGoods };
+module.exports = { getProducts, getProductDetail, createProduct, updateProduct, importGoods, getProductDiscounts };

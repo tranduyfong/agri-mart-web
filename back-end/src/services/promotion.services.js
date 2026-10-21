@@ -1,46 +1,41 @@
-const db = require('../configs/database.config');
+const Promotion = require('../models/promotion');
+const { escapeRegex } = require('../utils/string.util');
 
-/**
- * Lấy danh sách khuyến mãi ĐANG DIỄN RA (valid_from <= bây giờ <= valid_to)
- * filters: { keyword, is_flash_sale } - is_flash_sale: true / false / null (null = lấy tất cả)
- * Sắp xếp: chương trình sắp kết thúc đứng trước
- */
-const getActivePromotions = async (filters, pagination) => {
-    const { keyword, is_flash_sale } = filters;
-
-    const conditions = ['pr.valid_from <= NOW()', 'pr.valid_to >= NOW()'];
-    const params = [];
+const getActivePromotions = async ({ keyword, is_flash_sale }, pagination) => {
+    const now = new Date();
+    const query = {
+        valid_from: { $lte: now },
+        valid_to: { $gte: now }
+    };
 
     if (keyword) {
-        conditions.push('(pr.name LIKE ? OR pr.code LIKE ?)');
-        params.push(`%${keyword}%`, `%${keyword}%`);
+        query.$or = [{ name: { $regex: escapeRegex(keyword), $options: 'i' } }, { code: { $regex: escapeRegex(keyword), $options: 'i' } }];
     }
 
-    if (is_flash_sale !== null) {
-        conditions.push('pr.is_flash_sale = ?');
-        params.push(is_flash_sale ? 1 : 0);
+    if (is_flash_sale != null) {
+        query.is_flash_sale = is_flash_sale;
     }
 
-    const whereSql = 'WHERE ' + conditions.join(' AND ');
-
-    // 1. Đếm tổng số khuyến mãi (để tính totalPages)
-    const [countRows] = await db.execute(`SELECT COUNT(*) AS total FROM promotions pr ${whereSql}`, params);
-
-    // 2. Lấy dữ liệu của trang hiện tại (LIMIT/OFFSET truyền dạng chuỗi, xem ghi chú ở product.services.js)
-    const [promotions] = await db.execute(
-        `SELECT pr.id, pr.code, pr.name, pr.discount_value, pr.discount_type, pr.promotion_scope,
-                pr.is_flash_sale, pr.min_order_value, pr.valid_from, pr.valid_to,
-                (SELECT COUNT(*) FROM promotion_products pp WHERE pp.promotion_id = pr.id) AS product_count
-         FROM promotions pr
-         ${whereSql}
-         ORDER BY pr.valid_to ASC, pr.id ASC
-         LIMIT ? OFFSET ?`,
-        [...params, String(pagination.pageSize), String(pagination.offset)]
-    );
+    const [items, totalElements] = await Promise.all([
+        Promotion.find(query).sort({ valid_to: 1, _id: 1 }).skip(pagination.offset).limit(pagination.pageSize).lean(),
+        Promotion.countDocuments(query)
+    ]);
 
     return {
-        promotions,
-        totalElements: countRows[0].total
+        promotions: items.map((promotion) => ({
+            id: String(promotion._id),
+            code: promotion.code,
+            name: promotion.name,
+            discount_value: promotion.discount_value,
+            discount_type: promotion.discount_type,
+            promotion_scope: promotion.promotion_scope,
+            is_flash_sale: promotion.is_flash_sale ? 1 : 0,
+            min_order_value: promotion.min_order_value,
+            valid_from: promotion.valid_from,
+            valid_to: promotion.valid_to,
+            product_count: promotion.product_ids.length
+        })),
+        totalElements
     };
 };
 

@@ -1,11 +1,11 @@
 const express = require('express');
-const controller = require('../controllers/shopping.controllers');
+const wishlistController = require('../controllers/wishlist.controllers');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const router = express.Router();
 
 router.use(verifyToken);
-router.get('/', controller.getWishlist);
-router.put('/:id', controller.addWishlistItem);
-router.delete('/:id', controller.removeWishlistItem);
+router.get('/', wishlistController.getWishlist);
+router.put('/:id', wishlistController.addWishlistItem);
+router.delete('/:id', wishlistController.removeWishlistItem);
 
 module.exports = router;

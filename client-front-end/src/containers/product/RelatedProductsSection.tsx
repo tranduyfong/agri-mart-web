@@ -3,8 +3,8 @@ import useProducts from '../../hooks/useProducts';
 import { ROUTES } from '../../utils/constants';
 
 interface RelatedProductsSectionProps {
-  productId: number;
-  categoryId: number;
+  productId: string;
+  categoryId: string;
 }
 
 // Lấy thêm 1 sản phẩm để loại sản phẩm hiện tại mà vẫn có tối đa 6 gợi ý

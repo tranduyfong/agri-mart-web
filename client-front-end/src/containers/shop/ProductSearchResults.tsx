@@ -26,7 +26,7 @@ const ProductSearchResults = () => {
 
   // 1. Đọc điều kiện từ đường dẫn
   const keyword = searchParams.get('keyword') || '';
-  const categoryId = searchParams.get('category_id') ? Number(searchParams.get('category_id')) : undefined;
+  const categoryId = searchParams.get('category_id') || undefined;
   const isOnSale = searchParams.get('on_sale') === 'true';
   const sort = (searchParams.get('sort') as ProductSort) || 'best_selling';
   const pageNumber = Number(searchParams.get('pageNumber')) || 0;

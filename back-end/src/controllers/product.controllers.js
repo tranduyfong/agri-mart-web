@@ -16,13 +16,13 @@ const getQueryNumber = (value) => {
 
 /**
  * Đọc các bộ lọc của danh sách sản phẩm từ query
- * VD: ?keyword=cà chua&category_id=1&min_price=10000&max_price=50000&sort=price_asc
+ * VD: ?keyword=cà chua&min_price=10000&max_price=50000&sort=price_asc
  * Muốn thêm bộ lọc mới thì đọc thêm ở đây và thêm điều kiện trong productService.getProducts
  */
 const getProductFilters = (query) => {
     return {
         keyword: typeof query.keyword === 'string' ? query.keyword.trim() : '',
-        category_id: getQueryNumber(query.category_id),
+        category_id: typeof query.category_id === 'string' ? query.category_id.trim() : null,
         min_price: getQueryNumber(query.min_price),
         max_price: getQueryNumber(query.max_price),
         status: query.status || null,
@@ -44,8 +44,7 @@ const handleGetProducts = async (req, res, onlyPublished) => {
 
         const result = await productService.getProducts(filters, pagination);
 
-        return successResponse(res, result.products,
-            buildPagination(pagination.pageNumber, pagination.pageSize, result.totalElements));
+        return successResponse(res, result.products, buildPagination(pagination.pageNumber, pagination.pageSize, result.totalElements));
     } catch (error) {
         return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
@@ -60,7 +59,10 @@ const getManageProducts = (req, res) => handleGetProducts(req, res, false);
 // [Khách hàng] Chi tiết sản phẩm đang bán theo slug
 const getPublicProductDetail = async (req, res) => {
     try {
-        const product = await productService.getProductDetail({ slug: req.params.slug, onlyPublished: true });
+        const product = await productService.getProductDetail({
+            slug: req.params.slug,
+            onlyPublished: true
+        });
         return successResponse(res, product);
     } catch (error) {
         if (error.message === 'PRODUCT_NOT_FOUND') {
@@ -73,7 +75,10 @@ const getPublicProductDetail = async (req, res) => {
 // [Nhân viên] Chi tiết sản phẩm theo id (xem được cả sản phẩm nháp, ngừng bán)
 const getManageProductDetail = async (req, res) => {
     try {
-        const product = await productService.getProductDetail({ id: req.params.id, onlyPublished: false });
+        const product = await productService.getProductDetail({
+            id: req.params.id,
+            onlyPublished: false
+        });
         return successResponse(res, product);
     } catch (error) {
         if (error.message === 'PRODUCT_NOT_FOUND') {
@@ -88,13 +93,17 @@ const addProduct = async (req, res) => {
     const uploadedFiles = req.files || [];
 
     try {
-        const { category_id, code, name, description, status, variants } = req.body;
+        const { category_id, code, name, description, status, variants } = req.body || {};
 
         const productData = {
-            category_id, code, name, description, status,
+            category_id,
+            code,
+            name,
+            description,
+            status,
             variants: parseJsonField(variants), // multipart/form-data gửi mảng dạng chuỗi nên phải parse lại
-            uploaded_files: uploadedFiles,
-            user_id: req.user.userId // Lấy ID người thao tác từ token để lưu owner_id cho file
+            image_urls: parseJsonField(req.body?.image_urls),
+            uploaded_files: uploadedFiles
         };
 
         const result = await productService.createProduct(productData);
@@ -103,11 +112,19 @@ const addProduct = async (req, res) => {
         // Lưu DB lỗi thì xóa ảnh vừa upload, tránh rác trên server
         deleteUploadedFiles(uploadedFiles);
 
-        if (error.code === 'ER_DUP_ENTRY') {
+        if (error.code === 11000) {
             return errorResponse(res, 'DUPLICATE_DATA', 'Mã sản phẩm hoặc SKU đã tồn tại', 400);
         }
         if (error.message === 'CATEGORY_NOT_FOUND') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Danh mục không tồn tại', 400);
+        }
+        if (
+            error.name === 'ValidationError' ||
+            error.name === 'CastError' ||
+            ['INVALID_PRODUCT_DATA', 'PRODUCT_HAS_NO_VARIANT'].includes(error.message) ||
+            error instanceof SyntaxError
+        ) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Thông tin sản phẩm hoặc quy cách không hợp lệ', 400);
         }
         return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
@@ -119,15 +136,20 @@ const updateProduct = async (req, res) => {
     const uploadedFiles = req.files || [];
 
     try {
-        const { code, name, description, category_id, status, variants, delete_image_ids } = req.body;
+        const { code, name, description, category_id, status, variants, delete_image_ids } = req.body || {};
 
         const result = await productService.updateProduct({
             id: req.params.id,
-            code, name, description, category_id, status,
+            code,
+            name,
+            description,
+            category_id,
+            status,
             variants: parseJsonField(variants),
             delete_image_ids: parseJsonField(delete_image_ids),
-            uploaded_files: uploadedFiles,
-            user_id: req.user.userId
+            delete_image_urls: parseJsonField(req.body?.delete_image_urls),
+            image_urls: parseJsonField(req.body?.image_urls),
+            uploaded_files: uploadedFiles
         });
 
         return successResponse(res, result, null, 'Cập nhật sản phẩm thành công');
@@ -135,6 +157,9 @@ const updateProduct = async (req, res) => {
         // Lưu DB lỗi thì xóa ảnh mới vừa upload
         deleteUploadedFiles(uploadedFiles);
 
+        if (error.name === 'VersionError') {
+            return errorResponse(res, 'CONFLICT', 'Sản phẩm vừa thay đổi. Vui lòng thử lại.', 409);
+        }
         if (error.message === 'PRODUCT_NOT_FOUND') {
             return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Sản phẩm không tồn tại', 404);
         }
@@ -150,8 +175,16 @@ const updateProduct = async (req, res) => {
         if (error.message === 'PRODUCT_HAS_NO_VARIANT') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Sản phẩm phải có ít nhất 1 quy cách mới được công bố bán', 400);
         }
-        if (error.code === 'ER_DUP_ENTRY') {
+        if (error.code === 11000) {
             return errorResponse(res, 'DUPLICATE_DATA', 'Mã sản phẩm hoặc SKU đã tồn tại', 400);
+        }
+        if (
+            error.name === 'ValidationError' ||
+            error.name === 'CastError' ||
+            error.message === 'INVALID_PRODUCT_DATA' ||
+            error instanceof SyntaxError
+        ) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Thông tin sản phẩm hoặc quy cách không hợp lệ', 400);
         }
         return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
@@ -161,15 +194,22 @@ const updateProduct = async (req, res) => {
 // SKU chưa có -> tạo sản phẩm mới, SKU đã có -> cộng thêm số lượng tồn kho
 const importGoods = async (req, res) => {
     try {
-        const { branch_id, supplier_id, note, items } = req.body;
+        const { branch_id, supplier_id, note, items } = req.body || {};
 
         const result = await productService.importGoods({
-            items, branch_id, supplier_id, note,
+            items,
+            branch_id,
+            supplier_id,
+            note,
             user_id: req.user.userId
         });
 
-        return successResponse(res, result, null,
-            `Nhập hàng thành công ${result.total_rows} dòng (tạo mới ${result.created_products} sản phẩm, ${result.created_variants} SKU)`);
+        return successResponse(
+            res,
+            result,
+            null,
+            `Nhập hàng thành công ${result.total_rows} dòng (tạo mới ${result.created_products} sản phẩm, ${result.created_variants} SKU)`
+        );
     } catch (error) {
         if (error.message === 'INVALID_ROWS') {
             return errorResponse(res, 'VALIDATION_FAILED', `Có ${error.rows.length} dòng bị lỗi, vui lòng sửa lại`, 400, error.rows);
@@ -177,11 +217,14 @@ const importGoods = async (req, res) => {
         if (error.message === 'BRANCH_NOT_FOUND') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Chi nhánh không tồn tại', 400);
         }
-        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+        if (error.message === 'SUPPLIER_NOT_FOUND') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Nhà cung cấp không tồn tại', 400);
         }
-        if (error.code === 'ER_DUP_ENTRY') {
+        if (error.code === 11000) {
             return errorResponse(res, 'DUPLICATE_DATA', 'Có Mã SP hoặc SKU bị trùng lặp với hệ thống', 400, null, error.message);
+        }
+        if (error.name === 'ValidationError' || error.name === 'CastError' || error.message === 'INVALID_PRODUCT_DATA') {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Thông tin phiếu nhập không hợp lệ', 400);
         }
         return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống khi nhập hàng', 500, null, error.message);
     }

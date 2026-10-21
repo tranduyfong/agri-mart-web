@@ -1,27 +1,22 @@
-const mysql = require('mysql2/promise');
+const mongoose = require('mongoose');
+const dns = require('node:dns');
+
 require('dotenv').config();
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
-// Khởi tạo Pool kết nối tới MySQL
-const dbPool = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
-    decimalNumbers: true,     // Trả cột DECIMAL (giá tiền, số lượng) về dạng số thay vì chuỗi "25000.00"
-    waitForConnections: true, // Hàng đợi nếu các kết nối đang bận
-    connectionLimit: 10,      // Giới hạn số lượng kết nối đồng thời (tùy chỉnh theo server)
-    queueLimit: 0             // Không giới hạn hàng đợi
-});
+const connection = async () => {
+    try {
+        await mongoose.connect(process.env.MONGODB_URL, {
+            serverSelectionTimeoutMS: 10000
+        });
 
-// Kiểm tra kết nối khi server khởi động
-dbPool.getConnection()
-    .then(connection => {
-        console.log('Connected to MySQL Database successfully!');
-        connection.release(); // Trả kết nối lại cho pool
-    })
-    .catch(err => {
-        console.error('Failed to connect to MySQL:', err.message);
-    });
+        console.log('MongoDB connected successfully');
 
-module.exports = dbPool;
+    } catch (error) {
+        console.error('MongoDB connection failed:', error.message);
+
+        throw error;
+    }
+};
+
+module.exports = connection;

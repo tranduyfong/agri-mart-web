@@ -2,11 +2,10 @@
     "name": "back-end",
     "version": "1.0.0",
     "main": "src/index.js",
+    "engines": { "node": ">=22" },
     "scripts": {
         "start": "node src/index.js",
-        "dev": "nodemon src/index.js",
-        "test": "node test/run-tests.js",
-        "seed": "node seed/seed-demo.js"
+        "dev": "nodemon src/index.js"
     },
     "keywords": [],
     "author": "",
@@ -18,10 +17,9 @@
         "dayjs": "^1.11.21",
         "dotenv": "^17.4.2",
         "express": "^5.2.1",
-        "fs": "^0.0.1-security",
         "jsonwebtoken": "^9.0.3",
+        "mongoose": "^9.11.2",
         "multer": "^2.4.0",
-        "mysql2": "^3.22.5",
         "nodemailer": "^9.0.1",
         "nodemon": "^3.1.14",
         "slugify": "^1.6.9",

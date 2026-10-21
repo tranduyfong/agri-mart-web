@@ -1,3 +1,5 @@
+-- SCHEMA MYSQL LỊCH SỬ: backend hiện dùng Mongoose. Xem migrations/README.md.
+-- Không dùng file này để khởi tạo MongoDB.
 CREATE DATABASE IF NOT EXISTS do_an_tot_nghiep 
 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -37,6 +39,7 @@ CREATE TABLE `users` (
   `role_id` BIGINT UNSIGNED NOT NULL,
   `email` VARCHAR(254) NOT NULL UNIQUE,
   `password_hash` VARCHAR(255) NOT NULL,
+  `token_version` INT UNSIGNED NOT NULL DEFAULT 0,
   `full_name` VARCHAR(150) NOT NULL,
   `phone` VARCHAR(30) NULL,
   `status` ENUM('ACTIVE', 'LOCKED', 'PENDING') NOT NULL DEFAULT 'ACTIVE',

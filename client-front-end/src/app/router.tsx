@@ -8,6 +8,10 @@ import ShopPage from '../pages/ShopPage';
 import ProductDetailPage from '../pages/ProductDetailPage';
 import CartPage from '../pages/CartPage';
 import WishlistPage from '../pages/WishlistPage';
+import AccountPage from '../pages/AccountPage';
+import PersonalInformationForm from '../containers/account/PersonalInformationForm';
+import AddressBookSection from '../containers/account/AddressBookSection';
+import ChangePasswordForm from '../containers/account/ChangePasswordForm';
 import { ROUTES } from '../utils/constants';
 
 // Khai báo các trang của ứng dụng: mỗi đường dẫn (path) tương ứng với 1 trang (element)
@@ -47,6 +51,15 @@ export const router = createBrowserRouter([
   {
     path: ROUTES.WISHLIST,
     element: <WishlistPage />,
+  },
+  {
+    path: ROUTES.ACCOUNT,
+    element: <AccountPage />,
+    children: [
+      { index: true, element: <PersonalInformationForm /> },
+      { path: 'addresses', element: <AddressBookSection /> },
+      { path: 'change-password', element: <ChangePasswordForm /> },
+    ],
   },
   {
     // Đường dẫn không tồn tại -> về trang chủ

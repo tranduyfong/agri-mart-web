@@ -1,6 +1,6 @@
 // 1 danh mục sản phẩm (GET /api/category)
 export interface Category {
-  id: number;
+  id: string;
   name: string;
   slug: string;
   image_url: string | null;

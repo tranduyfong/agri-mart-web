@@ -1,275 +1,160 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const db = require('../configs/database.config');
+const User = require('../models/user');
 const transporter = require('../configs/mailer.config');
 const { getOtpEmailTemplate, getVerifyEmailTemplate } = require('../utils/mail.util');
+const { getProfile } = require('./account.services');
 
-// Số lần được phép nhập sai OTP, quá số lần này thì OTP bị hủy, người dùng phải yêu cầu mã mới
-const MAX_OTP_ATTEMPTS = 5;
-
-// Đếm số lần nhập sai OTP theo từng email (lưu tạm trên RAM)
-// VD: { 'verify:a@gmail.com': 2, 'reset:b@gmail.com': 1 }
-const otpFailedAttempts = {};
-
-// Sinh mã OTP 6 số (dùng crypto để mã khó đoán hơn Math.random)
-const generateOtp = () => crypto.randomInt(100000, 1000000).toString();
-
-// Ghi nhận 1 lần nhập sai OTP, nếu sai quá số lần cho phép thì xóa luôn OTP trong DB
-const handleWrongOtp = async (key, clearOtpQuery, email) => {
-    otpFailedAttempts[key] = (otpFailedAttempts[key] || 0) + 1;
-
-    if (otpFailedAttempts[key] >= MAX_OTP_ATTEMPTS) {
-        delete otpFailedAttempts[key];
-        await db.execute(clearOtpQuery, [email]);
-        throw new Error('OTP_TOO_MANY_ATTEMPTS');
-    }
-
-    throw new Error('INVALID_OTP');
-};
-
-const sendVerifyEmail = async (email, otpCode) => {
-    const mailOptions = {
-        from: `"AgriFood Smart" <${process.env.EMAIL_USER}>`,
+const sendOtp = async (email, otp, isVerifyEmail) => {
+    await transporter.sendMail({
+        from: '"AgriFood Smart" <' + process.env.EMAIL_USER + '>',
         to: email,
-        subject: 'Xác minh tài khoản - AgriFood Smart',
-        html: getVerifyEmailTemplate(otpCode)
-    };
-    await transporter.sendMail(mailOptions);
+        subject: isVerifyEmail ? 'Xác minh tài khoản - AgriFood Smart' : 'Mã OTP khôi phục mật khẩu - AgriFood Smart',
+        html: isVerifyEmail ? getVerifyEmailTemplate(otp) : getOtpEmailTemplate(otp)
+    });
 };
 
-const registerUser = async (data) => {
-    const { full_name, email, password, phone } = data;
+const registerUser = async ({ full_name, email, password, phone }) => {
+    email = email.trim().toLowerCase();
+    const conditions = [{ email }];
+    if (phone) conditions.push({ phone });
 
-    const [existingUsers] = await db.execute(
-        'SELECT id FROM users WHERE email = ? OR phone = ?',
-        [email, phone]
-    );
+    if (await User.exists({ $or: conditions })) throw new Error('USER_ALREADY_EXISTS');
 
-    if (existingUsers.length > 0) {
-        throw new Error('USER_ALREADY_EXISTS');
-    }
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const user = await User.create({
+        full_name,
+        email,
+        password_hash: await bcrypt.hash(password, 10),
+        phone: phone || null,
+        email_verify_token: otp,
+        email_verify_expires: new Date(Date.now() + 10 * 60 * 1000)
+    });
 
-    const [roles] = await db.execute('SELECT id FROM roles WHERE code = ?', ['CUSTOMER']);
-    if (roles.length === 0) throw new Error('ROLE_NOT_FOUND');
-    const roleId = roles[0].id;
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Sinh mã OTP xác minh email 6 số
-    const verifyToken = generateOtp();
-
-    // Dùng transaction: nếu gửi email bị lỗi thì hủy luôn việc tạo tài khoản,
-    // tránh trường hợp user bị lưu vào DB nhưng không nhận được mã và không thể đăng ký lại
-    const connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    let userId;
     try {
-        // Insert user với trạng thái PENDING, lưu mã OTP và set hạn 10 phút bằng hàm của MySQL
-        const [result] = await connection.execute(
-            `INSERT INTO users
-            (role_id, full_name, email, password_hash, phone, status, email_verify_token, email_verify_expires)
-            VALUES (?, ?, ?, ?, ?, 'PENDING', ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
-            [roleId, full_name, email, hashedPassword, phone, verifyToken]
-        );
-        userId = result.insertId;
-
-        // Gửi email xác minh, gửi thành công mới commit
-        await sendVerifyEmail(email, verifyToken);
-
-        await connection.commit();
+        await sendOtp(email, otp, true);
     } catch (error) {
-        await connection.rollback();
+        await User.deleteOne({ _id: user._id, status: 'PENDING', email_verify_token: otp });
         throw error;
-    } finally {
-        connection.release();
     }
 
-    const [newUsers] = await db.execute(
-        `SELECT u.id, u.full_name, u.email, u.phone, r.code AS role_code, u.status, u.created_at
-         FROM users u JOIN roles r ON u.role_id = r.id
-         WHERE u.id = ?`,
-        [userId]
-    );
-
-    return newUsers[0];
-};
-
-const verifyEmailAccount = async (email, otp) => {
-    const [users] = await db.execute(
-        'SELECT id, status, email_verify_token, email_verify_expires, NOW() as current_db_time FROM users WHERE email = ?',
-        [email]
-    );
-
-    if (users.length === 0) throw new Error('USER_NOT_FOUND');
-
-    const user = users[0];
-
-    if (user.status === 'ACTIVE') throw new Error('ALREADY_VERIFIED');
-    if (!user.email_verify_token) throw new Error('INVALID_OTP');
-
-    // Ép otp về chuỗi để so sánh (phòng trường hợp client gửi lên dạng số)
-    if (user.email_verify_token !== String(otp)) {
-        await handleWrongOtp(
-            'verify:' + email,
-            'UPDATE users SET email_verify_token = NULL, email_verify_expires = NULL WHERE email = ?',
-            email
-        );
-    }
-
-    const now = new Date(user.current_db_time);
-    const expiresAt = new Date(user.email_verify_expires);
-
-    if (now > expiresAt) throw new Error('OTP_EXPIRED');
-
-    // Cập nhật trạng thái thành ACTIVE, ghi nhận thời gian xác minh và xóa token
-    await db.execute(
-        `UPDATE users
-         SET status = 'ACTIVE', email_verified_at = NOW(), email_verify_token = NULL, email_verify_expires = NULL
-         WHERE email = ?`,
-        [email]
-    );
-    delete otpFailedAttempts['verify:' + email];
-
-    return true;
-};
-
-const resendVerifyEmail = async (email) => {
-    const [users] = await db.execute('SELECT id, status FROM users WHERE email = ?', [email]);
-
-    if (users.length === 0) throw new Error('USER_NOT_FOUND');
-    if (users[0].status !== 'PENDING') throw new Error('ALREADY_VERIFIED');
-
-    // Sinh mã mới, mã cũ sẽ bị ghi đè nên không dùng được nữa
-    const verifyToken = generateOtp();
-    await db.execute(
-        'UPDATE users SET email_verify_token = ?, email_verify_expires = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE email = ?',
-        [verifyToken, email]
-    );
-    delete otpFailedAttempts['verify:' + email];
-
-    await sendVerifyEmail(email, verifyToken);
+    return getProfile(user._id);
 };
 
 const loginUser = async (email, password) => {
-    // 1. Tìm user theo email (Phải JOIN bảng roles để lấy mã quyền)
-    // Chỉ SELECT các cột cần thiết, không lấy các cột OTP/token để tránh lộ ra ngoài
-    const [users] = await db.execute(
-        `SELECT u.id, u.full_name, u.email, u.phone, u.status, u.avatar_file_id, u.created_at,
-                u.password_hash, r.code AS role_code
-         FROM users u JOIN roles r ON u.role_id = r.id
-         WHERE u.email = ?`,
-        [email]
-    );
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+password_hash +token_version');
 
-    if (users.length === 0) throw new Error('INVALID_CREDENTIALS');
-
-    const user = users[0];
-
-    // 2. So sánh mật khẩu trước, để người không biết mật khẩu không biết được trạng thái tài khoản
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-        throw new Error('INVALID_CREDENTIALS');
-    }
-
-    // 3. Kiểm tra tài khoản có bị khóa hay chưa active không
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) throw new Error('INVALID_CREDENTIALS');
     if (user.status === 'LOCKED') throw new Error('ACCOUNT_LOCKED');
     if (user.status === 'PENDING') throw new Error('ACCOUNT_UNVERIFIED');
 
-    // 4. Tạo payload và ký JWT
-    const payload = {
-        userId: user.id.toString(),
-        role: user.role_code
-    };
+    const accessToken = jwt.sign(
+        { userId: user._id.toString(), role: user.role, tokenVersion: user.token_version },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN
-    });
+    return { user: await getProfile(user._id), accessToken };
+};
 
-    // 5. Xóa thuộc tính password_hash trước khi trả data ra ngoài
-    delete user.password_hash;
+const verifyEmailAccount = async (email, otp) => {
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).select(
+        '+email_verify_token +email_verify_expires +email_verify_attempts'
+    );
 
-    return {
-        user,
-        accessToken: token
-    };
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.status === 'ACTIVE') throw new Error('ALREADY_VERIFIED');
+    if (user.status === 'LOCKED') throw new Error('ACCOUNT_LOCKED');
+    if (!user.email_verify_token) throw new Error('INVALID_OTP');
+    if (!user.email_verify_expires || user.email_verify_expires < new Date()) throw new Error('OTP_EXPIRED');
+
+    if (user.email_verify_token !== String(otp)) {
+        user.email_verify_attempts += 1;
+        if (user.email_verify_attempts >= 5) {
+            user.email_verify_token = null;
+            user.email_verify_expires = null;
+        }
+        await user.save();
+        throw new Error(user.email_verify_attempts >= 5 ? 'OTP_TOO_MANY_ATTEMPTS' : 'INVALID_OTP');
+    }
+
+    user.status = 'ACTIVE';
+    user.email_verified_at = new Date();
+    user.email_verify_token = null;
+    user.email_verify_expires = null;
+    user.email_verify_attempts = 0;
+    await user.save();
+};
+
+const resendVerifyEmail = async (email) => {
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.status === 'ACTIVE') throw new Error('ALREADY_VERIFIED');
+    if (user.status === 'LOCKED') throw new Error('ACCOUNT_LOCKED');
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    await sendOtp(user.email, otp, true);
+
+    user.email_verify_token = otp;
+    user.email_verify_expires = new Date(Date.now() + 10 * 60 * 1000);
+    user.email_verify_attempts = 0;
+    await user.save();
 };
 
 const requestPasswordReset = async (email) => {
-    const [users] = await db.execute('SELECT id, full_name FROM users WHERE email = ?', [email]);
-    if (users.length === 0) {
-        throw new Error('USER_NOT_FOUND');
-    }
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.status === 'LOCKED') throw new Error('ACCOUNT_LOCKED');
 
-    const otpCode = generateOtp();
-    await db.execute(
-        'UPDATE users SET password_reset_token = ?, password_reset_expires = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE email = ?',
-        [otpCode, email]
-    );
-    delete otpFailedAttempts['reset:' + email];
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    await sendOtp(user.email, otp, false);
 
-    const mailOptions = {
-        from: `"AgriFood Smart" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: 'Mã OTP khôi phục mật khẩu - AgriFood Smart',
-        html: getOtpEmailTemplate(otpCode)
-    };
-
-    await transporter.sendMail(mailOptions);
+    user.password_reset_token = otp;
+    user.password_reset_expires = new Date(Date.now() + 10 * 60 * 1000);
+    user.password_reset_attempts = 0;
+    await user.save();
 };
 
 const verifyResetOtp = async (email, otp) => {
-    const [users] = await db.execute(
-        'SELECT id, password_reset_token, password_reset_expires, NOW() as current_db_time FROM users WHERE email = ?',
-        [email]
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).select(
+        '+password_reset_token +password_reset_expires +password_reset_attempts +token_version'
     );
 
-    if (users.length === 0) throw new Error('USER_NOT_FOUND');
-
-    const user = users[0];
-
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.status === 'LOCKED') throw new Error('ACCOUNT_LOCKED');
     if (!user.password_reset_token) throw new Error('INVALID_OTP');
+    if (!user.password_reset_expires || user.password_reset_expires < new Date()) throw new Error('OTP_EXPIRED');
 
     if (user.password_reset_token !== String(otp)) {
-        await handleWrongOtp(
-            'reset:' + email,
-            'UPDATE users SET password_reset_token = NULL, password_reset_expires = NULL WHERE email = ?',
-            email
-        );
+        user.password_reset_attempts += 1;
+        if (user.password_reset_attempts >= 5) {
+            user.password_reset_token = null;
+            user.password_reset_expires = null;
+        }
+        await user.save();
+        throw new Error(user.password_reset_attempts >= 5 ? 'OTP_TOO_MANY_ATTEMPTS' : 'INVALID_OTP');
     }
 
-    // Dùng giờ của DB để so sánh (giống verifyEmailAccount), tránh lệch múi giờ giữa server Node và MySQL
-    const now = new Date(user.current_db_time);
-    const expiresAt = new Date(user.password_reset_expires);
-
-    if (now > expiresAt) {
-        throw new Error('OTP_EXPIRED');
-    }
-
-    return true;
+    return user;
 };
 
 const resetPassword = async (email, otp, newPassword) => {
-    await verifyResetOtp(email, otp);
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    await db.execute(
-        'UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE email = ?',
-        [hashedPassword, email]
-    );
-    delete otpFailedAttempts['reset:' + email];
+    const user = await verifyResetOtp(email, otp);
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    user.token_version += 1;
+    user.password_reset_token = null;
+    user.password_reset_expires = null;
+    user.password_reset_attempts = 0;
+    await user.save();
 };
 
 module.exports = {
     registerUser,
     loginUser,
+    verifyEmailAccount,
+    resendVerifyEmail,
     requestPasswordReset,
     verifyResetOtp,
-    resetPassword,
-    verifyEmailAccount,
-    resendVerifyEmail
+    resetPassword
 };
