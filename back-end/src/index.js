@@ -34,6 +34,19 @@ const PORT = process.env.PORT || 8000;
 connection()
     .then(() => {
         app.listen(PORT, () => console.log('Server is running on port ' + PORT));
+        let checkingPayments = false;
+        const timer = setInterval(async () => {
+            if (checkingPayments) return;
+            checkingPayments = true;
+            try {
+                await require('./services/order.services').checkExpiredPayments();
+            } catch {
+                console.error('Chưa kiểm tra được các giao dịch VNPay đang chờ');
+            } finally {
+                checkingPayments = false;
+            }
+        }, 60000);
+        timer.unref();
     })
     .catch((error) => {
         console.error('Không thể kết nối MongoDB:', error.message);

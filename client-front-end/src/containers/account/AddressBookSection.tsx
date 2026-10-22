@@ -7,7 +7,7 @@ import useAccountContext from '../../hooks/useAccountContext';
 import type { UserAddress } from '../../types/account';
 
 const AddressBookSection = () => {
-  const { addresses, onAddressesUpdated, handleError } = useAccountContext();
+  const { user, addresses, onAddressesUpdated, handleError } = useAccountContext();
   const { message } = App.useApp();
   const [editor, setEditor] = useState<{ address: UserAddress | null } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +59,7 @@ const AddressBookSection = () => {
           ))}
         </div>
       )}
-      {editor && <AddressFormModal key={editor.address?.id ?? 'new'} address={editor.address} onClose={() => setEditor(null)} />}
+      {editor && <AddressFormModal key={editor.address?.id ?? 'new'} address={editor.address} onClose={() => setEditor(null)} user={user} addresses={addresses} onAddressesUpdated={onAddressesUpdated} handleError={handleError} />}
     </section>
   );
 };

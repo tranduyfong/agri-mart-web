@@ -3,22 +3,25 @@ import { Alert, App, Button, Checkbox, Form, Input, Modal, Select } from 'antd';
 import { EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons';
 import TextField from '../../components/TextField';
 import accountService from '../../services/accountService';
-import useAccountContext from '../../hooks/useAccountContext';
 import useAddressOptions from '../../hooks/useAddressOptions';
 import type { AddressFormValues, UserAddress } from '../../types/account';
+import type { AuthUser } from '../../types/auth';
 import { phoneRules, requiredRule } from '../../utils/validationRules';
 
 interface AddressFormModalProps {
   address: UserAddress | null;
   onClose: () => void;
+  user: AuthUser;
+  addresses: UserAddress[];
+  onAddressesUpdated: (addresses: UserAddress[]) => void;
+  handleError: (error: unknown) => void;
 }
 
 const normalizeSearch = (value: string) => {
   return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[đĐ]/g, 'd').toLowerCase();
 };
 
-const AddressFormModal = ({ address, onClose }: AddressFormModalProps) => {
-  const { user, addresses, onAddressesUpdated, handleError } = useAccountContext();
+const AddressFormModal = ({ address, onClose, user, addresses, onAddressesUpdated, handleError }: AddressFormModalProps) => {
   const { message } = App.useApp();
   const [form] = Form.useForm<AddressFormValues>();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,6 +99,7 @@ const AddressFormModal = ({ address, onClose }: AddressFormModalProps) => {
     >
       <Form
         id="account-address-form"
+        name="account-address"
         form={form}
         layout="vertical"
         requiredMark={false}

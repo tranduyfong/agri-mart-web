@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Checkbox, Empty } from 'antd';
 import { SafetyCertificateOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { useAppSelector } from '../../hooks/useRedux';
@@ -10,7 +10,9 @@ import { formatPrice } from '../../utils/format';
 import { canSelectCartItem, getCartItemPrice } from '../../utils/shopping';
 
 const CartSection = () => {
+  const navigate = useNavigate();
   const cart = useAppSelector((state) => state.shopping.cart);
+  const isBusy = useAppSelector((state) => state.shopping.pendingRequests.length > 0 || state.shopping.status === 'loading');
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
   const availableItems = cart.filter(canSelectCartItem);
   const selectedItems = availableItems.filter((item) => !excludedIds.includes(item.id));
@@ -33,7 +35,7 @@ const CartSection = () => {
             <Checkbox checked={allSelected} indeterminate={selectedItems.length > 0 && !allSelected} disabled={availableItems.length === 0} onChange={(event) => setExcludedIds(event.target.checked ? [] : availableItems.map((item) => item.id))}>Chọn tất cả ({availableItems.length})</Checkbox>
             <div className="flex flex-wrap items-center gap-5 sm:gap-8">
               <div className="text-right"><p className="text-sm text-gray-500">Tổng tạm tính ({selectedItems.length} sản phẩm)</p><p data-cart-total className="mt-1 text-2xl font-bold text-primary">{formatPrice(total)}</p></div>
-              <Link to={ROUTES.SHOP}><Button type="primary" size="large" className="font-semibold">Tiếp tục mua sắm</Button></Link>
+              <Button type="primary" size="large" className="h-12 bg-linear-to-b from-primary to-primary-dark font-semibold" disabled={!selectedItems.length || isBusy} onClick={() => navigate(ROUTES.CHECKOUT + '?items=' + selectedItems.map((item) => item.id).join(','))}>Thanh toán ({selectedItems.length})</Button>
             </div>
           </div>
           <p className="flex items-center gap-2 border-t border-gray-100 py-4 text-xs leading-5 text-gray-400"><SafetyCertificateOutlined className="text-primary" />Giá và tồn kho được cập nhật khi mở giỏ. Tạm tính chưa bao gồm phí giao hàng.</p>

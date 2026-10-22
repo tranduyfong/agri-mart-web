@@ -8,6 +8,9 @@ export const ROUTES = {
   SHOP: '/shop',
   PRODUCT_DETAIL: '/product/:slug',
   CART: '/cart',
+  CHECKOUT: '/checkout',
+  ORDER_RESULT: '/orders/:code',
+  VNPAY_RETURN: '/vnpay-return',
   WISHLIST: '/wishlist',
   ACCOUNT: '/account',
   ACCOUNT_ADDRESSES: '/account/addresses',
@@ -17,6 +20,7 @@ export const ROUTES = {
 
 // Dùng chung cho các link từ thẻ sản phẩm và danh sách đã xem
 export const getProductDetailPath = (slug: string) => ROUTES.PRODUCT_DETAIL.replace(':slug', encodeURIComponent(slug));
+export const getOrderResultPath = (code: string) => ROUTES.ORDER_RESULT.replace(':code', encodeURIComponent(code));
 
 // Thông tin cửa hàng hiển thị trên thanh trên cùng
 export const STORE_INFO = {

@@ -8,6 +8,38 @@ const orderSchema = new Schema({
         unique: true
     },
 
+    // Một lần thanh toán có thể gồm các đơn chuẩn bị tại nhiều cơ sở.
+    checkout_code: {
+        type: String,
+        default: null,
+        index: true
+    },
+
+    checkout_key: {
+        type: String,
+        default: null
+    },
+
+    payment_expires_at: {
+        type: Date,
+        default: null
+    },
+
+    payment_response_code: {
+        type: String,
+        default: null
+    },
+
+    paid_at: {
+        type: Date,
+        default: null
+    },
+
+    note: {
+        type: String,
+        default: ''
+    },
+
     user_id: {
         type: Schema.Types.ObjectId,
         ref: 'User',
@@ -75,8 +107,21 @@ const orderSchema = new Schema({
             },
 
             variant_sku: String,
+            name: String,
+            variant_name: String,
+            category_name: String,
+            unit: String,
+            thumbnail_url: { type: String, default: null },
+            list_price: Number,
             quantity: Number,
-            price: Number
+            price: Number,
+            stock_allocations: [{
+                _id: false,
+                batch_code: String,
+                quantity: Number,
+                manufactured_date: Date,
+                expiry_date: Date
+            }]
         }
     ],
 
@@ -98,5 +143,9 @@ const orderSchema = new Schema({
 });
 
 orderSchema.index({ 'items.product_id': 1, status: 1, created_at: -1 });
+orderSchema.index({ user_id: 1, checkout_key: 1, branch_id: 1 }, {
+    unique: true,
+    partialFilterExpression: { checkout_key: { $type: 'string' } }
+});
 
 module.exports = mongoose.model('Order', orderSchema);
