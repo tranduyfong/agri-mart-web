@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get('/vnpay-return', orderController.vnpayReturn);
 router.get('/vnpay-ipn', orderController.vnpayIpn);
+router.get('/', verifyToken, orderController.getMyOrders);
 router.post('/preview', verifyToken, orderController.getPreview);
 router.post('/checkout', verifyToken, orderController.checkout);
 router.get('/:code', verifyToken, orderController.getDetail);

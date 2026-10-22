@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from './api';
+
 // Kiểu sắp xếp danh sách sản phẩm mà back-end hỗ trợ
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'best_selling' | 'trending';
 
@@ -33,8 +35,13 @@ export interface ProductListItem {
   discount_percent: number | null; // % giảm giá đang áp dụng (null = không giảm)
 }
 
+export interface ProductListResponse extends PaginatedResponse<ProductListItem> {
+  meta?: { search_suggestion: string | null };
+}
+
 // Các trường thực sự hiển thị trên thẻ, dùng được cả cho danh sách và sản phẩm vừa xem
-export type ProductCardItem = Pick<ProductListItem,
+export type ProductCardItem = Pick<
+  ProductListItem,
   'id' | 'name' | 'slug' | 'min_price' | 'unit' | 'total_stock' | 'thumbnail_url' | 'discount_percent'
 >;
 

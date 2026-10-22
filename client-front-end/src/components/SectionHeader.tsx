@@ -10,7 +10,7 @@ interface SectionHeaderProps {
 // Tiêu đề của 1 khối trên trang (VD: "Danh mục ........ Xem tất cả")
 const SectionHeader = ({ title, linkTo, extra }: SectionHeaderProps) => {
   return (
-    <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-4">
         <h2 className="text-xl font-bold text-gray-900">{title}</h2>
         {extra}

@@ -7,7 +7,8 @@ const Supplier = require('../models/supplier');
 const Promotion = require('../models/promotion');
 const Order = require('../models/order');
 const GoodsReceipt = require('../models/goodsReceipt');
-const { normalizeSearch } = require('../utils/string.util');
+const { getSearchScore, getSearchSuggestion } = require('../utils/levenshtein.util');
+const { recommendProducts } = require('../utils/recommendation.util');
 const { getToday, parseDate } = require('../utils/date.util');
 const { availableStock } = require('../utils/productStock.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
@@ -22,6 +23,8 @@ const getProductDiscounts = async (productIds) => {
         valid_from: { $lte: now },
         valid_to: { $gte: now },
         discount_type: 'PERCENT',
+        promotion_scope: 'PRODUCT',
+        requires_code: { $ne: true },
         product_ids: { $in: productIds }
     });
 
@@ -54,9 +57,13 @@ const getProducts = async (filters, pagination) => {
     }
 
     let products = await Product.find(query).populate('category_id', 'name').lean();
+    const searchScores = {};
     if (filters.keyword) {
-        const keyword = normalizeSearch(filters.keyword);
-        products = products.filter((product) => normalizeSearch(product.name + ' ' + product.code).includes(keyword));
+        products = products.filter((product) => {
+            const score = getSearchScore(filters.keyword, product);
+            searchScores[product._id.toString()] = score;
+            return score !== null;
+        });
     }
 
     const productIds = products.map((product) => product._id);
@@ -86,7 +93,7 @@ const getProducts = async (filters, pagination) => {
         if (filters.on_sale && !offers.length) continue;
 
         const variants = [...product.variants].sort((a, b) => a.list_price - b.list_price);
-        const percentOffers = offers.filter((promotion) => promotion.discount_type === 'PERCENT');
+        const percentOffers = offers.filter((promotion) => promotion.discount_type === 'PERCENT' && promotion.promotion_scope === 'PRODUCT' && !promotion.requires_code);
         const stock = variants.reduce((total, variant) => total + availableStock(variant), 0);
 
         result.push({
@@ -110,6 +117,7 @@ const getProducts = async (filters, pagination) => {
     }
 
     result.sort((a, b) => {
+        if (filters.keyword && searchScores[a.id] !== searchScores[b.id]) return searchScores[a.id] - searchScores[b.id];
         if (filters.sort === 'price_asc') return a.min_price - b.min_price || b.id.localeCompare(a.id);
         if (filters.sort === 'price_desc') return b.min_price - a.min_price || b.id.localeCompare(a.id);
         if (filters.sort === 'name_asc') return a.name.localeCompare(b.name, 'vi') || b.id.localeCompare(a.id);
@@ -121,8 +129,31 @@ const getProducts = async (filters, pagination) => {
 
     return {
         products: result.slice(pagination.offset, pagination.offset + pagination.pageSize),
-        totalElements: result.length
+        totalElements: result.length,
+        searchSuggestion: getSearchSuggestion(filters.keyword, result)
     };
+};
+
+const getRelatedProducts = async (productId) => {
+    if (!mongoose.isObjectIdOrHexString(productId)) throw new Error('PRODUCT_NOT_FOUND');
+    productId = new mongoose.Types.ObjectId(productId).toString();
+    const products = await Product.find({ status: 'PUBLISHED' })
+        .select('name description category_id variants.unit')
+        .populate('category_id', 'name')
+        .lean();
+    if (!products.some((product) => product._id.toString() === productId)) throw new Error('PRODUCT_NOT_FOUND');
+
+    const recommendations = recommendProducts(productId, products);
+    if (!recommendations.length) return [];
+    const result = await getProducts(
+        {
+            status: 'PUBLISHED',
+            product_ids: recommendations.map((product) => product.id)
+        },
+        { offset: 0, pageSize: 6 }
+    );
+    const byId = new Map(result.products.map((product) => [product.id, product]));
+    return recommendations.map((product) => byId.get(product.id)).filter(Boolean);
 };
 
 const getProductDetail = async ({ id, slug, onlyPublished }) => {
@@ -403,4 +434,4 @@ const importGoods = async (data) => {
     });
 };
 
-module.exports = { getProducts, getProductDetail, createProduct, updateProduct, importGoods, getProductDiscounts };
+module.exports = { getProducts, getProductDetail, getRelatedProducts, createProduct, updateProduct, importGoods, getProductDiscounts };

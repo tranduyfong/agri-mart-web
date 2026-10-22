@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { Checkbox, Empty, Pagination, Select } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import ProductCard from '../../components/ProductCard';
 import ProductCardSkeleton from '../../components/ProductCardSkeleton';
 import useCategories from '../../hooks/useCategories';
@@ -32,7 +33,7 @@ const ProductSearchResults = () => {
   const pageNumber = Number(searchParams.get('pageNumber')) || 0;
 
   // 2. Gọi API theo điều kiện
-  const { products, totalElements, isLoading } = useProducts({
+  const { products, totalElements, isLoading, suggestedKeyword } = useProducts({
     keyword: keyword || undefined,
     category_id: categoryId,
     on_sale: isOnSale || undefined,
@@ -94,6 +95,26 @@ const ProductSearchResults = () => {
           />
         </div>
       </div>
+
+      {suggestedKeyword && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-gray-700"
+        >
+          <SearchOutlined className="mt-1 shrink-0 text-primary" />
+          <p>
+            Đang hiển thị sản phẩm gần đúng với “{keyword}”. Bạn có muốn tìm{' '}
+            <button
+              type="button"
+              className="cursor-pointer break-words font-semibold text-primary underline underline-offset-4 hover:text-primary-dark"
+              onClick={() => updateParam('keyword', suggestedKeyword)}
+            >
+              {suggestedKeyword}
+            </button>
+            ?
+          </p>
+        </div>
+      )}
 
       {/* Danh sách sản phẩm */}
       {!isLoading && products.length === 0 ? (

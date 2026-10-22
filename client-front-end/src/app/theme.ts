@@ -7,7 +7,11 @@ const antdTheme: ThemeConfig = {
     colorPrimary: '#12b80a',
     colorLink: '#12b80a',
     borderRadius: 8,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: "'Be Vietnam Pro', sans-serif",
+    fontSize: 16,
+    fontSizeSM: 14,
+    fontSizeLG: 18,
+    controlHeight: 40,
   },
   components: {
     Form: {

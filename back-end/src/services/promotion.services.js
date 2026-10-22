@@ -1,6 +1,12 @@
 const Promotion = require('../models/promotion');
 const { escapeRegex } = require('../utils/string.util');
 
+const getCoupon = async (code, session = null) => {
+    const promotion = await Promotion.findOne({ code: { $regex: '^' + escapeRegex(code.trim()) + '$', $options: 'i' } }).session(session);
+    if (!promotion) throw new Error('COUPON_NOT_FOUND');
+    return promotion;
+};
+
 const getActivePromotions = async ({ keyword, is_flash_sale }, pagination) => {
     const now = new Date();
     const query = {
@@ -30,6 +36,7 @@ const getActivePromotions = async ({ keyword, is_flash_sale }, pagination) => {
             discount_type: promotion.discount_type,
             promotion_scope: promotion.promotion_scope,
             is_flash_sale: promotion.is_flash_sale ? 1 : 0,
+            requires_code: promotion.requires_code ? 1 : 0,
             min_order_value: promotion.min_order_value,
             valid_from: promotion.valid_from,
             valid_to: promotion.valid_to,
@@ -39,4 +46,4 @@ const getActivePromotions = async ({ keyword, is_flash_sale }, pagination) => {
     };
 };
 
-module.exports = { getActivePromotions };
+module.exports = { getActivePromotions, getCoupon };

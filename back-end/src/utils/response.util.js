@@ -11,7 +11,7 @@ const getServerTime = () => dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]');
 /**
  * Trả về response thành công (có hoặc không có phân trang)
  */
-const successResponse = (res, data, pagination = null, message = "Success", statusCode = 200) => {
+const successResponse = (res, data, pagination = null, message = "Success", statusCode = 200, meta = null) => {
     const response = {
         code: "SUCCESS",
         message: message,
@@ -19,6 +19,8 @@ const successResponse = (res, data, pagination = null, message = "Success", stat
         serverTime: getServerTime(),
         data: data
     };
+
+    if (meta) response.meta = meta;
 
     // Nếu có thông tin phân trang thì thêm vào response
     if (pagination) {

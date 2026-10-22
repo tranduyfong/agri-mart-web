@@ -262,6 +262,16 @@ const seedData = async () => {
         {
             code: 'DEMO-EXPIRED', name: 'Khuyến mãi đã hết hạn', discount_type: 'PERCENT', discount_value: 50,
             valid_from: getDate(-30), valid_to: getDate(-2), product_ids: [savedProducts[0]._id]
+        },
+        {
+            code: 'DEMO-GIAM10', name: 'Giảm thêm 10% tiền hàng', discount_type: 'PERCENT', discount_value: 10,
+            requires_code: true, min_order_value: 100000,
+            valid_from: getDate(-1), valid_to: getDate(30), product_ids: []
+        },
+        {
+            code: 'DEMO-GIAM30', name: 'Giảm 30.000đ tiền hàng', discount_type: 'AMOUNT', discount_value: 30000,
+            requires_code: true, min_order_value: 300000,
+            valid_from: getDate(-1), valid_to: getDate(30), product_ids: []
         }
     ];
 
@@ -342,7 +352,7 @@ const seedData = async () => {
         });
     }
 
-    console.log('Đã nạp dữ liệu mẫu: 12 danh mục, 26 sản phẩm, 2 cơ sở, 4 khuyến mãi và 3 đơn hàng.');
+    console.log('Đã nạp dữ liệu mẫu: 12 danh mục, 26 sản phẩm, 2 cơ sở, 6 khuyến mãi và 3 đơn hàng.');
     console.log('Khách hàng: customer.demo@agrimart.local');
     console.log('Nhân viên: staff.demo@agrimart.local');
     console.log('Quản trị viên: admin.demo@agrimart.local');

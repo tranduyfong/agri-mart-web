@@ -1,6 +1,6 @@
 import { Avatar } from 'antd';
 import { NavLink } from 'react-router-dom';
-import { EnvironmentOutlined, LockOutlined, RightOutlined, UserOutlined } from '@ant-design/icons';
+import { EnvironmentOutlined, LockOutlined, RightOutlined, TruckOutlined, UserOutlined } from '@ant-design/icons';
 import type { AuthUser } from '../../types/auth';
 import { ROUTES } from '../../utils/constants';
 
@@ -10,8 +10,17 @@ interface AccountSidebarProps {
 
 const ACCOUNT_LINKS = [
   { path: ROUTES.ACCOUNT, label: 'Thông tin cá nhân', icon: <UserOutlined /> },
-  { path: ROUTES.ACCOUNT_ADDRESSES, label: 'Sổ địa chỉ', icon: <EnvironmentOutlined /> },
-  { path: ROUTES.ACCOUNT_PASSWORD, label: 'Đổi mật khẩu', icon: <LockOutlined /> },
+  {
+    path: ROUTES.ACCOUNT_ADDRESSES,
+    label: 'Sổ địa chỉ',
+    icon: <EnvironmentOutlined />,
+  },
+  {
+    path: ROUTES.ACCOUNT_PASSWORD,
+    label: 'Đổi mật khẩu',
+    icon: <LockOutlined />,
+  },
+  { path: ROUTES.ORDERS, label: 'Theo dõi đơn hàng', icon: <TruckOutlined /> },
 ];
 
 // Chỉ hiển thị các mục đã được hỗ trợ trong hệ thống
@@ -32,7 +41,9 @@ const AccountSidebar = ({ user }: AccountSidebarProps) => {
             key={item.path}
             to={item.path}
             end
-            className={({ isActive }) => `flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition lg:gap-3 ${isActive ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-white hover:text-primary'}`}
+            className={({ isActive }) =>
+              `flex shrink-0 items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold transition lg:gap-3 ${isActive ? 'bg-primary/10 text-primary' : 'text-gray-600 hover:bg-white hover:text-primary'}`
+            }
           >
             {item.icon}
             <span>{item.label}</span>

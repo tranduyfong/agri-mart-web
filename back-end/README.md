@@ -23,7 +23,7 @@ Trong thư mục `back-end`, chạy:
 npm run seed
 ```
 
-File `seed.js` dùng lại kết nối MongoDB trong `.env`, không gửi email. Dữ liệu gồm 12 danh mục, 26 sản phẩm (24 đang bán, 1 nháp, 1 ngừng bán), tồn kho ở 2 cơ sở, 1 nhà cung cấp, 2 phiếu nhập, 4 khuyến mãi và 3 đơn đã hoàn tất.
+File `seed.js` dùng lại kết nối MongoDB trong `.env`, không gửi email. Dữ liệu gồm 12 danh mục, 26 sản phẩm (24 đang bán, 1 nháp, 1 ngừng bán), tồn kho ở 2 cơ sở, 1 nhà cung cấp, 2 phiếu nhập, 6 khuyến mãi và 3 đơn đã hoàn tất.
 
 | Vai trò | Email | Mật khẩu ban đầu |
 | --- | --- | --- |
@@ -92,14 +92,26 @@ Nếu Sandbox trả mã `71` / “The terminal (website) not approved”, cần 
 
 Đăng ký **IPN URL** với VNPay: `https://<địa-chỉ-backend>/api/order/vnpay-ipn`. IPN cần địa chỉ công khai để VNPay gọi được. Khi chạy localhost, trang `/vnpay-return` vẫn gửi kết quả về backend để xác minh. Xem [tài liệu tích hợp VNPay](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html).
 
-- `POST /api/order/preview`: nhận `cart_item_ids`, `checkout_key`, trả giá hiện tại và tổng tiền.
-- `POST /api/order/checkout`: thêm `address_id`, `recipient_name`, `phone`, `email`, `note`, `payment_method` (`COD`/`VNPAY`), `expected_total` từ preview. Trả `checkout_code` và `redirectUrl` khi cần đến VNPay.
+- `POST /api/order/preview`: nhận `cart_item_ids`, `checkout_key`, `coupon_code` (không bắt buộc), trả giá hiện tại, mã áp dụng và tổng tiền.
+- `POST /api/order/checkout`: thêm `address_id`, `recipient_name`, `phone`, `email`, `note`, `payment_method` (`COD`/`VNPAY`), `expected_total` từ preview và cùng `coupon_code`. Trả `checkout_code` và `redirectUrl` khi cần đến VNPay.
 - `GET /api/order/:code`: xem đơn của chính tài khoản đã đặt.
 - `POST /api/order/:code/payment-url`: tiếp tục phiên VNPay còn hạn.
 - `POST /api/order/:code/check-payment`: đối soát kết quả giao dịch qua QueryDR.
 - `GET /api/order/vnpay-return` và `/api/order/vnpay-ipn`: xác minh callback từ VNPay.
 
 Backend tính tiền từ sản phẩm và khuyến mãi hiện tại, kiểm tra lại tồn kho, địa chỉ và tổng tiền trước khi lưu. Thông tin sản phẩm/người nhận được lưu thành bản chụp trong đơn. Cùng `checkout_key` gửi lại sẽ trả đơn đã tạo, tránh đặt trùng.
+
+### Mã giảm giá
+
+Mỗi đơn dùng một mã, không phân biệt chữ hoa/thường. Mã có thể giảm theo phần trăm hoặc số tiền, cho sản phẩm hoặc phí giao hàng. `min_order_value` tính trên tiền hàng sau ưu đãi tự động, chưa tính vận chuyển. Với mã sản phẩm, `product_ids` rỗng nghĩa là toàn bộ sản phẩm; nếu có ID thì chỉ giảm các sản phẩm đó. Tiền giảm không vượt quá phần tiền hợp lệ.
+
+Đặt `requires_code: true` cho khuyến mãi phần trăm sản phẩm cần khách nhập mã. Khuyến mãi phần trăm sản phẩm cũ (`requires_code: false`) vẫn tự động giảm trên giá; nhập lại mã này không giảm thêm lần nữa. Mã giảm số tiền và phí vận chuyển được áp dụng khi nhập mã. Mã được kiểm tra lại trong transaction lúc đặt hàng, lưu mã/tên/số tiền giảm trong Order; đơn nhiều cơ sở phân bổ tiền giảm đúng từng đồng. VNPay nhận số tiền cuối cùng sau giảm. Đơn 0đ xác nhận bằng COD.
+
+Chạy lại `npm run seed` để bổ sung mã thử (không ghi đè dữ liệu đã có):
+
+- `DEMO-GIAM10`: giảm thêm 10% tiền hàng, đơn từ 100.000đ.
+- `DEMO-GIAM30`: giảm 30.000đ tiền hàng, đơn từ 300.000đ.
+- `DEMO-SHIP15`: giảm tối đa 15.000đ phí giao hàng, đơn từ 200.000đ.
 
 Một lần thanh toán có thể gồm nhiều đơn theo cơ sở, dùng chung `checkout_code`. Phí giao hàng chỉ tính một lần. Lô còn hạn được xuất theo hạn sử dụng gần nhất. Đặt hàng và trừ kho dùng transaction MongoDB.
 

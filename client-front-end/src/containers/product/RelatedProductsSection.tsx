@@ -1,5 +1,7 @@
 import ProductRow from '../../components/ProductRow';
-import useProducts from '../../hooks/useProducts';
+import { useEffect, useState } from 'react';
+import productService from '../../services/productService';
+import type { ProductListItem } from '../../types/product';
 import { ROUTES } from '../../utils/constants';
 
 interface RelatedProductsSectionProps {
@@ -7,15 +9,32 @@ interface RelatedProductsSectionProps {
   categoryId: string;
 }
 
-// Lấy thêm 1 sản phẩm để loại sản phẩm hiện tại mà vẫn có tối đa 6 gợi ý
+// API đã xếp gợi ý theo độ tương đồng nội dung, giữ nguyên thứ tự khi hiển thị.
 const RelatedProductsSection = ({ productId, categoryId }: RelatedProductsSectionProps) => {
-  const { products, isLoading } = useProducts({ category_id: categoryId, sort: 'best_selling', pageSize: 7 });
+  const [result, setResult] = useState<{
+    id: string;
+    products: ProductListItem[];
+  } | null>(null);
+  useEffect(() => {
+    let outdated = false;
+    productService
+      .getRelatedProducts(productId)
+      .then((products) => {
+        if (!outdated) setResult({ id: productId, products });
+      })
+      .catch(() => {
+        if (!outdated) setResult({ id: productId, products: [] });
+      });
+    return () => {
+      outdated = true;
+    };
+  }, [productId]);
 
   return (
     <ProductRow
-      title="Sản phẩm cùng danh mục"
-      products={products.filter((product) => product.id !== productId).slice(0, 6)}
-      isLoading={isLoading}
+      title="Sản phẩm tương tự"
+      products={result?.id === productId ? result.products : []}
+      isLoading={result?.id !== productId}
       linkTo={`${ROUTES.SHOP}?category_id=${categoryId}`}
     />
   );

@@ -36,6 +36,11 @@ const promotionSchema = new Schema({
         default: false
     },
 
+    requires_code: {
+        type: Boolean,
+        default: false
+    },
+
     min_order_value: {
         type: Number,
         default: 0

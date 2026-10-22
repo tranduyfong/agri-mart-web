@@ -7,8 +7,11 @@ const Branch = require('../models/branch');
 const Promotion = require('../models/promotion');
 const Order = require('../models/order');
 const cartService = require('./cart.services');
+const promotionService = require('./promotion.services');
+const { calculateCouponDiscount, getEligibleAmount, allocateDiscount } = require('../utils/promotion.util');
 const vnpayInstance = require('../configs/vnpay.config');
 const { availableStock } = require('../utils/productStock.util');
+const { normalizeSearch } = require('../utils/string.util');
 const { getToday, parseDate, formatVnpayDate, parseVnpayDate } = require('../utils/date.util');
 
 const getShippingFee = () => {
@@ -17,7 +20,7 @@ const getShippingFee = () => {
     return fee;
 };
 
-const getPreview = async (userId, cartItemIds, checkoutKey) => {
+const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '') => {
     if (checkoutKey) {
         const existing = await Order.findOne({ user_id: userId, checkout_key: checkoutKey });
         if (existing) return { checkout: await getCheckout(userId, existing.checkout_code) };
@@ -49,28 +52,44 @@ const getPreview = async (userId, cartItemIds, checkoutKey) => {
     }
 
     const shippingFee = getShippingFee();
+    const coupon = couponCode ? calculateCouponDiscount(await promotionService.getCoupon(couponCode), items, shippingFee) : null;
+    const couponDiscount = coupon?.discount_amount || 0;
     return {
         items,
         subtotal,
-        discount_amount: subtotal - total,
+        discount_amount: subtotal - total + couponDiscount,
         shipping_fee: shippingFee,
-        total: total + shippingFee,
-        vnpay_available: !!vnpayInstance && !!process.env.VNP_RETURN_URL
+        total: total + shippingFee - couponDiscount,
+        coupon: coupon ? { code: coupon.code, name: coupon.name, discount_amount: couponDiscount } : null,
+        vnpay_available: !!vnpayInstance && !!process.env.VNP_RETURN_URL && total + shippingFee - couponDiscount > 0
     };
 };
 
-const getCheckout = async (userId, checkoutCode) => {
-    const orders = await Order.find({ user_id: userId, checkout_code: checkoutCode }).sort({ code: 1 });
-    if (!orders.length) throw new Error('ORDER_NOT_FOUND');
-
+// Một lần mua có thể được chuẩn bị tại nhiều cơ sở, nhưng hiển thị cùng một đơn.
+const buildCheckoutSummary = (orders) => {
     const first = orders[0];
+    const activeOrders = orders.filter((order) => order.status !== 'CANCELLED');
+    const stages = ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED'];
+    const status = activeOrders.length ? stages[Math.min(...activeOrders.map((order) => stages.indexOf(order.status)))] : 'CANCELLED';
     return {
-        checkout_code: checkoutCode,
+        checkout_code: first.checkout_code || first.code,
         order_codes: orders.map((order) => order.code),
         payment_method: first.payment_method,
-        payment_status: first.payment_status,
-        status: first.status,
+        payment_status: orders.every((order) => order.payment_status === 'PAID')
+            ? 'PAID'
+            : orders.every((order) => order.payment_status === 'REFUNDED')
+              ? 'REFUNDED'
+              : 'UNPAID',
+        status,
         created_at: first.created_at,
+        updated_at: new Date(Math.max(...orders.map((order) => new Date(order.updated_at || order.created_at).getTime()))),
+        branch_orders: orders.map((order) => ({
+            code: order.code,
+            branch_name: order.branch_id?.name || 'AgriFood Smart',
+            status: order.status,
+            payment_status: order.payment_status,
+            updated_at: order.updated_at
+        })),
         paid_at: first.paid_at,
         transaction_code: first.transaction_code,
         payment_expires_at: first.payment_expires_at,
@@ -78,23 +97,68 @@ const getCheckout = async (userId, checkoutCode) => {
         note: first.note,
         subtotal: orders.reduce((total, order) => total + order.total_amount, 0),
         discount_amount: orders.reduce((total, order) => total + order.discount_amount, 0),
+        coupon: first.coupon_code ? {
+            code: first.coupon_code,
+            name: first.coupon_name,
+            discount_amount: orders.reduce((total, order) => total + (order.coupon_discount_amount || 0), 0)
+        } : null,
         shipping_fee: orders.reduce((total, order) => total + order.shipping_fee, 0),
         total: orders.reduce((total, order) => total + order.final_amount, 0),
         items: orders.flatMap((order) =>
-            order.items.map((item) => ({
-                product_id: item.product_id.toString(),
-                variant_id: item.variant_id.toString(),
-                name: item.name,
-                variant_name: item.variant_name,
-                category_name: item.category_name,
-                unit: item.unit,
-                thumbnail_url: item.thumbnail_url,
-                quantity: item.quantity,
-                list_price: item.list_price,
-                price: item.price,
-                line_total: Math.round(item.price * item.quantity)
-            }))
+            order.items.map((item) => {
+                const product = item.product_id;
+                const variant = product?.variants?.find((entry) => entry._id.equals(item.variant_id));
+                return {
+                    product_id: product?._id.toString() || '',
+                    variant_id: item.variant_id?.toString() || '',
+                    name: item.name || product?.name || 'Sản phẩm không còn kinh doanh',
+                    variant_name: item.variant_name || variant?.name || '',
+                    category_name: item.category_name || '',
+                    unit: item.unit || variant?.unit || '',
+                    thumbnail_url: item.name ? item.thumbnail_url : product?.images?.[0] || null,
+                    quantity: item.quantity,
+                    list_price: item.list_price ?? item.price,
+                    price: item.price,
+                    line_total: Math.round(item.price * item.quantity)
+                };
+            })
         )
+    };
+};
+
+const getCheckout = async (userId, checkoutCode) => {
+    const orders = await Order.find({
+        user_id: userId,
+        $or: [{ checkout_code: checkoutCode }, { code: checkoutCode, checkout_code: null }]
+    })
+        .populate('branch_id', 'name')
+        .populate('items.product_id', 'name images variants')
+        .sort({ code: 1 });
+    if (!orders.length) throw new Error('ORDER_NOT_FOUND');
+    return buildCheckoutSummary(orders);
+};
+
+const getMyOrders = async (userId, filters, pagination) => {
+    const orders = await Order.find({ user_id: userId })
+        .populate('branch_id', 'name')
+        .populate('items.product_id', 'name images variants')
+        .sort({ created_at: -1, code: 1 });
+
+    const groups = new Map();
+    for (const order of orders) {
+        const code = order.checkout_code || order.code;
+        if (!groups.has(code)) groups.set(code, []);
+        groups.get(code).push(order);
+    }
+    const keyword = normalizeSearch(filters.keyword);
+    const result = [...groups.values()].map(buildCheckoutSummary).filter((order) => {
+        if (filters.status && order.status !== filters.status) return false;
+        const text = [order.checkout_code, ...order.order_codes, ...order.items.map((item) => item.name)].join(' ');
+        return !keyword || normalizeSearch(text).includes(keyword);
+    });
+    return {
+        orders: result.slice(pagination.offset, pagination.offset + pagination.pageSize),
+        totalElements: result.length
     };
 };
 
@@ -135,6 +199,7 @@ const createCheckout = async (userId, data) => {
         const nowPromotions = await Promotion.find({
             discount_type: 'PERCENT',
             promotion_scope: 'PRODUCT',
+            requires_code: { $ne: true },
             valid_from: { $lte: now },
             valid_to: { $gte: now }
         }).session(session);
@@ -214,13 +279,20 @@ const createCheckout = async (userId, data) => {
             group.discount += Math.round(variant.list_price * cartItem.quantity) - Math.round(price * cartItem.quantity);
         }
 
-        const total = groups.reduce((sum, group) => sum + group.subtotal - group.discount, 0) + getShippingFee();
-        if (!Number.isSafeInteger(total) || total <= 0) throw new Error('INVALID_AMOUNT');
+        const shippingFee = getShippingFee();
+        const coupon = data.coupon_code ? calculateCouponDiscount(
+            await promotionService.getCoupon(data.coupon_code, session), groups.flatMap((group) => group.items), shippingFee
+        ) : null;
+        const couponAmounts = !coupon ? groups.map(() => 0) : coupon.promotion_scope === 'SHIPPING'
+            ? groups.map((_, index) => index === 0 ? coupon.discount_amount : 0)
+            : allocateDiscount(coupon.discount_amount, groups.map((group) => getEligibleAmount(group.items, coupon.product_ids)));
+        const total = groups.reduce((sum, group) => sum + group.subtotal - group.discount, 0) + shippingFee - (coupon?.discount_amount || 0);
+        if (!Number.isSafeInteger(total) || total < 0 || (total === 0 && data.payment_method === 'VNPAY')) throw new Error('INVALID_AMOUNT');
         if (total !== data.expected_total) throw new Error('PRICE_CHANGED');
 
         for (let index = 0; index < groups.length; index++) {
             const group = groups[index];
-            const shippingFee = index === 0 ? getShippingFee() : 0;
+            const branchShippingFee = index === 0 ? shippingFee : 0;
             const order = new Order({
                 code: checkoutCode + '-' + (index + 1),
                 checkout_code: checkoutCode,
@@ -228,9 +300,13 @@ const createCheckout = async (userId, data) => {
                 user_id: user._id,
                 branch_id: group.branch_id,
                 total_amount: group.subtotal,
-                discount_amount: group.discount,
-                shipping_fee: shippingFee,
-                final_amount: group.subtotal - group.discount + shippingFee,
+                discount_amount: group.discount + couponAmounts[index],
+                coupon_code: coupon?.code || null,
+                coupon_name: coupon?.name || null,
+                coupon_discount_amount: couponAmounts[index],
+                shipping_fee: branchShippingFee,
+                final_amount: group.subtotal - group.discount - couponAmounts[index] + branchShippingFee,
+                promotions: coupon && couponAmounts[index] > 0 ? [{ promotion_id: coupon.promotion_id, discount_amount: couponAmounts[index] }] : [],
                 status: data.payment_method === 'COD' ? 'CONFIRMED' : 'PENDING',
                 payment_method: data.payment_method,
                 payment_status: 'UNPAID',
@@ -409,4 +485,4 @@ const checkExpiredPayments = async () => {
     }
 };
 
-module.exports = { getPreview, getCheckout, createCheckout, getPaymentUrl, updatePayment, checkPayment, checkExpiredPayments };
+module.exports = { getPreview, getCheckout, getMyOrders, createCheckout, getPaymentUrl, updatePayment, checkPayment, checkExpiredPayments };

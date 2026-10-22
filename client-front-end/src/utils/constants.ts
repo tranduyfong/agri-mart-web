@@ -9,6 +9,7 @@ export const ROUTES = {
   PRODUCT_DETAIL: '/product/:slug',
   CART: '/cart',
   CHECKOUT: '/checkout',
+  ORDERS: '/orders',
   ORDER_RESULT: '/orders/:code',
   VNPAY_RETURN: '/vnpay-return',
   WISHLIST: '/wishlist',
@@ -44,7 +45,7 @@ export const FOOTER_LINK_GROUPS = [
     links: [
       { label: 'Yêu thích', path: ROUTES.WISHLIST },
       { label: 'Giỏ hàng', path: ROUTES.CART },
-      { label: 'Theo dõi đơn hàng', path: '#' },
+      { label: 'Theo dõi đơn hàng', path: ROUTES.ORDERS },
       { label: 'Thông tin giao hàng', path: ROUTES.ACCOUNT_ADDRESSES },
     ],
   },

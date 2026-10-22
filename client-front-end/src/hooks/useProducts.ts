@@ -7,6 +7,7 @@ import type { ProductListItem, ProductQuery } from '../types/product';
 const useProducts = (query: ProductQuery) => {
   const [products, setProducts] = useState<ProductListItem[]>([]);
   const [totalElements, setTotalElements] = useState(0);
+  const [suggestedKeyword, setSuggestedKeyword] = useState<string | null>(null);
 
   // Đổi query thành chuỗi để so sánh (object mới tạo mỗi lần render nên không so sánh trực tiếp được)
   const queryKey = JSON.stringify(query);
@@ -22,11 +23,13 @@ const useProducts = (query: ProductQuery) => {
         if (isOutdated) return;
         setProducts(response.data);
         setTotalElements(response.totalElements);
+        setSuggestedKeyword(response.meta?.search_suggestion || null);
       })
       .catch(() => {
         if (isOutdated) return;
         setProducts([]);
         setTotalElements(0);
+        setSuggestedKeyword(null);
       })
       .finally(() => {
         if (!isOutdated) setLoadedQueryKey(queryKey);
@@ -41,6 +44,7 @@ const useProducts = (query: ProductQuery) => {
     products,
     totalElements,
     isLoading: loadedQueryKey !== queryKey,
+    suggestedKeyword: loadedQueryKey === queryKey ? suggestedKeyword : null,
   };
 };
 

@@ -8,9 +8,10 @@ interface OrderSummaryProps {
   summary: CheckoutSummary;
   address?: string;
   children?: ReactNode;
+  couponInput?: ReactNode;
 }
 
-const OrderSummary = ({ summary, address, children }: OrderSummaryProps) => (
+const OrderSummary = ({ summary, address, children, couponInput }: OrderSummaryProps) => (
   <aside className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
     <div className="flex items-center justify-between border-b border-gray-100 px-5 py-5 sm:px-6">
       <h2 className="text-lg font-bold text-gray-900">Chi tiết đơn hàng</h2>
@@ -36,10 +37,12 @@ const OrderSummary = ({ summary, address, children }: OrderSummaryProps) => (
       <p className="flex items-center gap-2 text-gray-500"><TruckOutlined className="text-primary" /> Giao hàng tận nơi</p>
       {address && <p className="flex items-start gap-2 text-gray-600"><EnvironmentOutlined className="mt-1 shrink-0 text-primary" /><span className="leading-6">{address}</span></p>}
     </div>
+    {couponInput}
     <dl className="space-y-3 border-t border-gray-100 px-5 py-5 text-sm sm:px-6">
       <div className="flex justify-between gap-3"><dt className="text-gray-500">Tạm tính</dt><dd className="font-medium">{formatPrice(summary.subtotal)}</dd></div>
-      {summary.discount_amount > 0 && <div className="flex justify-between gap-3"><dt className="text-gray-500">Giảm giá sản phẩm</dt><dd className="font-semibold text-primary">−{formatPrice(summary.discount_amount)}</dd></div>}
+      {summary.discount_amount - (summary.coupon?.discount_amount || 0) > 0 && <div className="flex justify-between gap-3"><dt className="text-gray-500">Ưu đãi sản phẩm</dt><dd className="font-semibold text-primary">−{formatPrice(summary.discount_amount - (summary.coupon?.discount_amount || 0))}</dd></div>}
       <div className="flex justify-between gap-3"><dt className="text-gray-500">Phí giao hàng</dt><dd className="font-medium">{formatPrice(summary.shipping_fee)}</dd></div>
+      {summary.coupon && <div className="flex justify-between gap-3"><dt className="min-w-0 break-all text-gray-500">Mã {summary.coupon.code}</dt><dd className="shrink-0 font-semibold text-primary">−{formatPrice(summary.coupon.discount_amount)}</dd></div>}
       <div className="flex items-center justify-between gap-3 border-t border-dashed border-gray-200 pt-4"><dt className="font-bold text-gray-900">Tổng thanh toán</dt><dd data-checkout-total className="text-2xl font-bold text-primary">{formatPrice(summary.total)}</dd></div>
     </dl>
     {children && <div className="px-5 pb-5 sm:px-6">{children}<p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-gray-400"><SafetyCertificateOutlined className="text-primary" />Thông tin thanh toán được bảo mật</p></div>}

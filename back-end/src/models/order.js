@@ -64,6 +64,21 @@ const orderSchema = new Schema({
         default: 0
     },
 
+    coupon_code: {
+        type: String,
+        default: null
+    },
+
+    coupon_name: {
+        type: String,
+        default: null
+    },
+
+    coupon_discount_amount: {
+        type: Number,
+        default: 0
+    },
+
     final_amount: Number,
 
     status: {
@@ -143,6 +158,7 @@ const orderSchema = new Schema({
 });
 
 orderSchema.index({ 'items.product_id': 1, status: 1, created_at: -1 });
+orderSchema.index({ user_id: 1, created_at: -1 });
 orderSchema.index({ user_id: 1, checkout_key: 1, branch_id: 1 }, {
     unique: true,
     partialFilterExpression: { checkout_key: { $type: 'string' } }

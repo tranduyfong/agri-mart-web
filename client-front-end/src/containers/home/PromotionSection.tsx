@@ -1,16 +1,16 @@
 import { Skeleton } from 'antd';
-import SectionHeader from '../../components/SectionHeader';
+import HorizontalSection from '../../components/HorizontalSection';
 import PromotionCard from '../../components/PromotionCard';
 import CountdownTimer from '../../components/CountdownTimer';
 import useActivePromotions from '../../hooks/useActivePromotions';
 
-// Số thẻ khuyến mãi hiển thị trên trang chủ
-const MAX_PROMOTIONS = 4;
+// Số thẻ giữ chỗ khi API đang tải khuyến mãi.
+const SKELETON_COUNT = 4;
 
 // Khối "Khuyến mãi đang diễn ra": đồng hồ đếm ngược tới khuyến mãi sắp hết hạn nhất + các thẻ khuyến mãi
 const PromotionSection = () => {
   // Chỉ lấy khuyến mãi thường, flash sale được hiển thị riêng ở khối FlashSaleBanner
-  const { promotions, isLoading } = useActivePromotions(false, MAX_PROMOTIONS);
+  const { promotions, isLoading } = useActivePromotions(false, 100);
 
   if (!isLoading && promotions.length === 0) return null;
 
@@ -18,20 +18,17 @@ const PromotionSection = () => {
   const nearestEndTime = promotions[0]?.valid_to;
 
   return (
-    <section>
-      <SectionHeader
-        title="Khuyến mãi đang diễn ra"
-        extra={nearestEndTime && <CountdownTimer endTime={nearestEndTime} />}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading
-          ? Array.from({ length: MAX_PROMOTIONS }).map((_, index) => (
-              <Skeleton.Node key={index} active className="h-40! w-full!" />
-            ))
-          : promotions.map((promotion) => <PromotionCard key={promotion.id} promotion={promotion} />)}
-      </div>
-    </section>
+    <HorizontalSection
+      title="Khuyến mãi đang diễn ra"
+      extra={nearestEndTime && <CountdownTimer endTime={nearestEndTime} />}
+      itemClassName="w-72 sm:w-80"
+    >
+      {isLoading
+        ? Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+            <Skeleton.Node key={index} active className="h-40! w-full!" />
+          ))
+        : promotions.map((promotion) => <PromotionCard key={promotion.id} promotion={promotion} />)}
+    </HorizontalSection>
   );
 };
 

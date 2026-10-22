@@ -36,6 +36,7 @@ const handleGetProducts = async (req, res, onlyPublished) => {
     try {
         const pagination = getPagination(req.query);
         const filters = getProductFilters(req.query);
+        if (filters.keyword.length > 120) return errorResponse(res, 'VALIDATION_FAILED', 'Từ khóa tối đa 120 ký tự', 400);
 
         // Khách hàng chỉ được xem sản phẩm đang bán, bỏ qua status do client gửi lên
         if (onlyPublished) {
@@ -44,7 +45,9 @@ const handleGetProducts = async (req, res, onlyPublished) => {
 
         const result = await productService.getProducts(filters, pagination);
 
-        return successResponse(res, result.products, buildPagination(pagination.pageNumber, pagination.pageSize, result.totalElements));
+        const paginationData = buildPagination(pagination.pageNumber, pagination.pageSize, result.totalElements);
+        const meta = filters.keyword ? { search_suggestion: result.searchSuggestion || null } : null;
+        return successResponse(res, result.products, paginationData, 'Success', 200, meta);
     } catch (error) {
         return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
     }
@@ -55,6 +58,15 @@ const getPublicProducts = (req, res) => handleGetProducts(req, res, true);
 
 // [Nhân viên] Danh sách tất cả sản phẩm (bao gồm nháp, ngừng bán), lọc được theo status
 const getManageProducts = (req, res) => handleGetProducts(req, res, false);
+
+const getRelatedProducts = async (req, res) => {
+    try {
+        return successResponse(res, await productService.getRelatedProducts(req.params.id));
+    } catch (error) {
+        if (error.message === 'PRODUCT_NOT_FOUND') return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Sản phẩm không tồn tại', 404);
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Lỗi hệ thống', 500, null, error.message);
+    }
+};
 
 // [Khách hàng] Chi tiết sản phẩm đang bán theo slug
 const getPublicProductDetail = async (req, res) => {
@@ -233,6 +245,7 @@ const importGoods = async (req, res) => {
 module.exports = {
     getPublicProducts,
     getPublicProductDetail,
+    getRelatedProducts,
     getManageProducts,
     getManageProductDetail,
     addProduct,

@@ -9,6 +9,7 @@ import ProductDetailPage from '../pages/ProductDetailPage';
 import CartPage from '../pages/CartPage';
 import CheckoutPage from '../pages/CheckoutPage';
 import OrderResultPage from '../pages/OrderResultPage';
+import OrdersPage from '../pages/OrdersPage';
 import VnpayReturnPage from '../pages/VnpayReturnPage';
 import WishlistPage from '../pages/WishlistPage';
 import AccountPage from '../pages/AccountPage';
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
   },
   { path: ROUTES.CHECKOUT, element: <CheckoutPage /> },
   { path: ROUTES.ORDER_RESULT, element: <OrderResultPage /> },
+  { path: ROUTES.ORDERS, element: <OrdersPage /> },
   { path: ROUTES.VNPAY_RETURN, element: <VnpayReturnPage /> },
   {
     path: ROUTES.WISHLIST,

@@ -11,6 +11,7 @@ const router = express.Router();
 
 // 1. Danh sách sản phẩm: ?keyword=&pageNumber=0&pageSize=20&category_id=&min_price=&max_price=&sort=
 router.get('/', productController.getPublicProducts);
+router.get('/:id/related', productController.getRelatedProducts);
 
 // ================= NHÂN VIÊN / ADMIN (cần quyền PRODUCT_MANAGE) =================
 // Xem được tất cả sản phẩm (nháp, đang bán, ngừng bán)

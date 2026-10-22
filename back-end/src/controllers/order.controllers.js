@@ -3,9 +3,36 @@ const orderService = require('../services/order.services');
 const vnpayInstance = require('../configs/vnpay.config');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+const { getPagination, buildPagination } = require('../utils/pagination.util');
+
+const COUPON_ERRORS = {
+    COUPON_NOT_FOUND: 'Mã giảm giá không tồn tại. Vui lòng kiểm tra lại.',
+    COUPON_EXPIRED: 'Mã giảm giá chưa đến thời gian áp dụng hoặc đã hết hạn.',
+    COUPON_MIN_ORDER: 'Giá trị tiền hàng sau ưu đãi chưa đạt mức tối thiểu của mã giảm giá.',
+    COUPON_ALREADY_APPLIED: 'Ưu đãi này đã được tự động áp dụng trên giá sản phẩm.',
+    COUPON_NOT_APPLICABLE: 'Mã giảm giá không áp dụng cho sản phẩm hoặc phí giao hàng của đơn này.'
+};
+
+const isValidCouponCode = (code) => code === undefined || (typeof code === 'string' && /^[a-zA-Z0-9_-]{0,80}$/.test(code.trim()));
+
+const getMyOrders = async (req, res) => {
+    try {
+        const status = req.query.status || '';
+        const keyword = typeof req.query.keyword === 'string' ? req.query.keyword.trim() : '';
+        if ((status && !['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED'].includes(status)) || keyword.length > 120) {
+            return errorResponse(res, 'VALIDATION_FAILED', 'Bộ lọc đơn hàng không hợp lệ', 400);
+        }
+        const pagination = getPagination(req.query);
+        const result = await orderService.getMyOrders(req.user.userId, { status, keyword }, pagination);
+        return successResponse(res, result.orders, buildPagination(pagination.pageNumber, pagination.pageSize, result.totalElements));
+    } catch (error) {
+        return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Không thể tải đơn hàng', 500, null, error.message);
+    }
+};
+
 const getPreview = async (req, res) => {
     try {
-        const { cart_item_ids, checkout_key } = req.body || {};
+        const { cart_item_ids, checkout_key, coupon_code } = req.body || {};
         if (
             !Array.isArray(cart_item_ids) ||
             !cart_item_ids.length ||
@@ -13,13 +40,15 @@ const getPreview = async (req, res) => {
             cart_item_ids.some((id) => !mongoose.isObjectIdOrHexString(id)) ||
             new Set(cart_item_ids).size !== cart_item_ids.length ||
             typeof checkout_key !== 'string' ||
-            !/^[a-zA-Z0-9-]{16,80}$/.test(checkout_key)
+            !/^[a-zA-Z0-9-]{16,80}$/.test(checkout_key) ||
+            !isValidCouponCode(coupon_code)
         ) {
             return errorResponse(res, 'VALIDATION_FAILED', 'Danh sách sản phẩm thanh toán không hợp lệ', 400);
         }
-        const preview = await orderService.getPreview(req.user.userId, cart_item_ids, checkout_key);
+        const preview = await orderService.getPreview(req.user.userId, cart_item_ids, checkout_key, coupon_code?.trim());
         return successResponse(res, preview);
     } catch (error) {
+        if (COUPON_ERRORS[error.message]) return errorResponse(res, error.message, COUPON_ERRORS[error.message], 400);
         if (error.message === 'CART_CHANGED' || error.message === 'INSUFFICIENT_STOCK') {
             return errorResponse(res, 'CART_CHANGED', 'Giỏ hàng hoặc tồn kho đã thay đổi. Vui lòng kiểm tra lại giỏ hàng.', 409);
         }
@@ -49,7 +78,8 @@ const checkout = async (req, res) => {
             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim()) ||
             !['COD', 'VNPAY'].includes(data.payment_method) ||
             !Number.isSafeInteger(data.expected_total) ||
-            data.expected_total <= 0 ||
+            data.expected_total < 0 ||
+            !isValidCouponCode(data.coupon_code) ||
             (data.note !== undefined && (typeof data.note !== 'string' || data.note.length > 1000))
         ) {
             return errorResponse(res, 'VALIDATION_FAILED', 'Thông tin người nhận, địa chỉ hoặc sản phẩm không hợp lệ', 400);
@@ -64,7 +94,8 @@ const checkout = async (req, res) => {
             email: data.email.trim(),
             note: data.note?.trim(),
             payment_method: data.payment_method,
-            expected_total: data.expected_total
+            expected_total: data.expected_total,
+            coupon_code: data.coupon_code?.trim()
         });
 
         let redirectUrl = null;
@@ -79,6 +110,7 @@ const checkout = async (req, res) => {
         }
         return successResponse(res, { checkout_code: order.checkout_code, redirectUrl }, null, 'Đã tạo đơn hàng', 201);
     } catch (error) {
+        if (COUPON_ERRORS[error.message]) return errorResponse(res, error.message, COUPON_ERRORS[error.message], 400);
         if (error.message === 'ADDRESS_NOT_FOUND') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Địa chỉ không còn trong sổ địa chỉ của bạn. Vui lòng chọn lại.', 400);
         }
@@ -181,4 +213,4 @@ const vnpayIpn = async (req, res) => {
     }
 };
 
-module.exports = { getPreview, checkout, getDetail, getPaymentUrl, checkPayment, vnpayReturn, vnpayIpn };
+module.exports = { getMyOrders, getPreview, checkout, getDetail, getPaymentUrl, checkPayment, vnpayReturn, vnpayIpn };

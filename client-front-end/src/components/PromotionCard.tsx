@@ -18,6 +18,7 @@ const getDiscountText = (promotion: Promotion) => {
 // Thẻ khuyến mãi màu xanh: mức giảm, nội dung, điều kiện, thời gian áp dụng, mã, nút mua ngay
 const PromotionCard = ({ promotion }: PromotionCardProps) => {
   const isShippingPromotion = promotion.promotion_scope === 'SHIPPING';
+  const isCoupon = !!promotion.requires_code || isShippingPromotion || promotion.discount_type === 'AMOUNT';
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden rounded-xl bg-linear-to-br from-primary to-primary-dark p-4 text-white">
@@ -28,6 +29,7 @@ const PromotionCard = ({ promotion }: PromotionCardProps) => {
       <p className="text-xs text-white/90">{isShippingPromotion ? 'Giảm phí giao hàng' : 'Giảm đến'}</p>
       <p className="text-3xl font-bold">{getDiscountText(promotion)}</p>
       <p className="mt-1 text-sm font-medium">{promotion.name}</p>
+      {isCoupon && <p className="mt-1 text-xs text-white/90">Nhập mã khi thanh toán</p>}
 
       {promotion.min_order_value > 0 && (
         <p className="mt-1 text-xs text-white/80">Đơn tối thiểu {formatPrice(promotion.min_order_value)}</p>
@@ -44,7 +46,7 @@ const PromotionCard = ({ promotion }: PromotionCardProps) => {
         </div>
 
         <Link
-          to={`${ROUTES.SHOP}?on_sale=true`}
+          to={isCoupon ? ROUTES.SHOP : `${ROUTES.SHOP}?on_sale=true`}
           className="relative shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary-dark hover:bg-green-50"
         >
           Mua ngay

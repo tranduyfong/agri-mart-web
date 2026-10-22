@@ -4,7 +4,7 @@
  */
 @layer theme, base, antd, components, utilities;
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Màu sắc và font dùng chung cho toàn bộ giao diện (dùng được như class: bg-primary, text-primary...) */
 @theme {
@@ -12,23 +12,55 @@
   --color-primary-dark: #0b7d05;
   --color-page-gray: #f3f4f3;
 
-  --font-sans: "Quicksand", sans-serif;
+  --font-sans: 'Be Vietnam Pro', sans-serif;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
 }
 
 body {
   margin: 0;
   background-color: #ffffff;
   color: #1f1f1f;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.horizontal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5c9 transparent;
+}
+
+/* Máy tính dùng hai nút ở hai đầu hàng; điện thoại vẫn có thể vuốt. */
+@media (min-width: 1024px) {
+  .horizontal-scroll { scrollbar-width: none; }
+  .horizontal-scroll::-webkit-scrollbar { display: none; }
+}
+.hero-carousel .slick-dots {
+  bottom: 52px;
+}
+.hero-carousel .slick-arrow {
+  z-index: 2;
 }
 
 /* Phản hồi khi thêm vào giỏ / yêu thích, hỗ trợ cài đặt giảm chuyển động */
 @keyframes shopping-bump {
-  0%, 100% { transform: scale(1); }
-  35% { transform: translateY(-5px) scale(1.22); }
-  65% { transform: translateY(1px) scale(0.94); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  35% {
+    transform: translateY(-5px) scale(1.22);
+  }
+  65% {
+    transform: translateY(1px) scale(0.94);
+  }
 }
 
-.shopping-bump { animation: shopping-bump 500ms ease-out; }
+.shopping-bump {
+  animation: shopping-bump 500ms ease-out;
+}
 .shopping-particle {
   position: fixed;
   z-index: 2000;
@@ -45,7 +77,21 @@ body {
   font-size: 28px;
   box-shadow: 0 4px 20px #0002;
 }
-.shopping-particle img { width: 100%; height: 100%; object-fit: contain; }
+.shopping-particle img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 @media (prefers-reduced-motion: reduce) {
-  .shopping-bump { animation: none; }
+  .shopping-bump {
+    animation: none;
+  }
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .hero-carousel .slick-track {
+    transition: none !important;
+  }
 }

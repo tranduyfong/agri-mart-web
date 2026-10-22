@@ -1,17 +1,38 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Input, Select } from 'antd';
+import { Button, Carousel, Input, Select } from 'antd';
 import { AppstoreOutlined, SearchOutlined } from '@ant-design/icons';
 import heroImage from '../../assets/images/home-hero.jpg';
+import productsImage from '../../assets/images/why-products.jpg';
+import storeImage from '../../assets/images/why-store.jpg';
 import useCategories from '../../hooks/useCategories';
 import { ROUTES } from '../../utils/constants';
+
+const BANNERS = [
+  {
+    image: heroImage,
+    title: 'Tươi ngon mỗi ngày, an tâm mỗi bữa ăn',
+    description: 'Nông sản tươi sạch, lựa chọn dễ dàng và giao tận nhà.',
+  },
+  {
+    image: productsImage,
+    title: 'Mang sắc xanh về căn bếp của bạn',
+    description: 'Khám phá rau củ và trái cây cho bữa cơm đủ đầy.',
+  },
+  {
+    image: storeImage,
+    title: 'Đi chợ thật tiện, chọn gì cũng có',
+    description: 'Mua sắm thực phẩm yêu thích ngay tại AgriFood Smart.',
+  },
+];
 
 // Ảnh lớn đầu trang chủ + khung tìm kiếm sản phẩm (từ khóa + danh mục)
 const HeroSection = () => {
   const navigate = useNavigate();
   const { categories } = useCategories();
   const [keyword, setKeyword] = useState('');
-  const [categoryId, setCategoryId] = useState<number>();
+  const [categoryId, setCategoryId] = useState<string>();
+  const [autoplay] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // Bấm "Tìm sản phẩm" -> sang trang cửa hàng kèm điều kiện tìm kiếm trên đường dẫn
   const handleSearch = () => {
@@ -23,15 +44,36 @@ const HeroSection = () => {
 
   return (
     <section className="relative">
-      {/* Ảnh nền + lớp phủ tối để chữ dễ đọc */}
-      <div className="relative h-72 overflow-hidden rounded-b-3xl sm:h-80">
-        <img src={heroImage} alt="Siêu thị nông sản" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/30 to-black/10" />
-
-        <div className="absolute inset-x-0 bottom-16 mx-auto max-w-7xl px-4 text-white">
-          <h1 className="text-2xl font-bold sm:text-4xl">Mọi thứ bạn cần mỗi ngày, có ngay tại một nơi!</h1>
-          <p className="mt-3 text-base text-white/90">Mua sắm nông sản tươi sạch tiện lợi mà không cần ra khỏi nhà.</p>
-        </div>
+      <div className="relative overflow-hidden rounded-b-3xl">
+        <Carousel
+          className="hero-carousel"
+          autoplay={autoplay}
+          autoplaySpeed={5000}
+          speed={700}
+          arrows
+          infinite
+          draggable
+          pauseOnHover
+          pauseOnFocus
+        >
+          {BANNERS.map((banner, index) => (
+            <div key={banner.image}>
+              <div className="relative h-80 sm:h-96">
+                <img src={banner.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-black/20" />
+                <div className="absolute inset-x-0 bottom-24 mx-auto max-w-7xl px-10 text-white sm:px-12">
+                  <p className="mb-3 text-sm font-semibold tracking-widest text-green-200">AGRIFOOD SMART</p>
+                  {index === 0 ? (
+                    <h1 className="max-w-3xl text-2xl font-bold leading-snug sm:text-4xl">{banner.title}</h1>
+                  ) : (
+                    <h2 className="max-w-3xl text-2xl font-bold leading-snug sm:text-4xl">{banner.title}</h2>
+                  )}
+                  <p className="mt-3 max-w-2xl text-base text-white/90">{banner.description}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </Carousel>
       </div>
 
       {/* Khung tìm kiếm nằm đè lên mép dưới của ảnh */}
@@ -59,7 +101,10 @@ const HeroSection = () => {
               prefix={<AppstoreOutlined className="text-gray-400" />}
               value={categoryId}
               onChange={(value) => setCategoryId(value)}
-              options={categories.map((category) => ({ value: category.id, label: category.name }))}
+              options={categories.map((category) => ({
+                value: category.id,
+                label: category.name,
+              }))}
             />
           </div>
 

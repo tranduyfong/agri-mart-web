@@ -7,6 +7,7 @@ import TextField from '../../components/TextField';
 import PrimaryButton from '../../components/PrimaryButton';
 import AddressFormModal from '../account/AddressFormModal';
 import OrderSummary from './OrderSummary';
+import CouponInput from './CouponInput';
 import orderService from '../../services/orderService';
 import { useAppDispatch } from '../../hooks/useRedux';
 import { fetchShopping } from '../../store/slices/shoppingSlice';
@@ -35,6 +36,10 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
   const [isAddressOpen, setIsAddressOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [summary, setSummary] = useState(preview);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const applyingCouponRef = useRef(false);
   const submittingRef = useRef(false);
   const paymentMethod = Form.useWatch('payment_method', form) || (preview.vnpay_available ? 'VNPAY' : 'COD');
   const selectedAddress = addresses.find((address) => address.id === addressId);
@@ -54,14 +59,39 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
     if (added) selectAddress(added.id, list);
   };
 
+  const applyCoupon = async (code: string) => {
+    if (applyingCouponRef.current || submittingRef.current) return;
+    applyingCouponRef.current = true;
+    setIsApplyingCoupon(true);
+    setCouponError('');
+    try {
+      const result = await orderService.getPreview(cartItemIds, checkoutKey, code);
+      if (getSavedAccessToken() !== sessionToken) return;
+      if ('checkout' in result) { navigate(getOrderResultPath(result.checkout.checkout_code), { replace: true }); return; }
+      setSummary(result);
+      setSubmitError('');
+      if (!result.vnpay_available) form.setFieldValue('payment_method', 'COD');
+    } catch (error) {
+      if (getSavedAccessToken() !== sessionToken) return;
+      setCouponError(getErrorMessage(error));
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        clearAuth(); dispatch(logout()); navigate(ROUTES.LOGIN, { state: { returnTo: window.location.pathname + window.location.search } });
+      }
+    } finally {
+      applyingCouponRef.current = false;
+      setIsApplyingCoupon(false);
+    }
+  };
+
   const handleSubmit = async (values: CheckoutFormValues) => {
-    if (submittingRef.current || !selectedAddress) return;
+    if (submittingRef.current || applyingCouponRef.current || !selectedAddress) return;
     submittingRef.current = true;
     setIsSubmitting(true);
     setSubmitError('');
     try {
       const result = await orderService.checkout({
-        ...values, address_id: selectedAddress.id, cart_item_ids: cartItemIds, checkout_key: checkoutKey, expected_total: preview.total,
+        ...values, address_id: selectedAddress.id, cart_item_ids: cartItemIds, checkout_key: checkoutKey,
+        expected_total: summary.total, coupon_code: summary.coupon?.code || '',
       });
       if (getSavedAccessToken() !== sessionToken) return;
       sessionStorage.removeItem('agrimart.checkout.' + account.user.id);
@@ -91,7 +121,7 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
       form={form}
       layout="vertical"
       requiredMark={false}
-      disabled={isSubmitting}
+      disabled={isSubmitting || isApplyingCoupon}
       onFinish={handleSubmit}
       initialValues={{
         recipient_name: initialAddress?.recipient_name || account.user.full_name,
@@ -156,19 +186,19 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
             <p className="mt-2 text-sm leading-6 text-gray-500">Chọn cách thanh toán thuận tiện cho bạn.</p>
             <Form.Item name="payment_method" className="mb-0! mt-5">
               <Radio.Group className="w-full! space-y-3 text-sm">
-                <div className={`flex items-center gap-3 rounded-xl border p-4 transition ${paymentMethod === 'VNPAY' ? 'border-primary bg-primary/4' : 'border-gray-200'} ${!preview.vnpay_available ? 'opacity-50' : ''}`}>
-                  <Radio value="VNPAY" aria-label="Thanh toán qua VNPay" disabled={!preview.vnpay_available} />
-                  <div className="flex-1"><button type="button" disabled={!preview.vnpay_available || isSubmitting} className="cursor-pointer text-left font-semibold text-gray-800" onClick={() => form.setFieldValue('payment_method', 'VNPAY')}>Thanh toán qua VNPay</button><p className="mt-1 text-xs leading-5 text-gray-500">Quét QR, thẻ ATM hoặc tài khoản ngân hàng</p></div>
+                <div className={`flex items-center gap-3 rounded-xl border p-4 transition ${paymentMethod === 'VNPAY' ? 'border-primary bg-primary/4' : 'border-gray-200'} ${!summary.vnpay_available ? 'opacity-50' : ''}`}>
+                  <Radio value="VNPAY" aria-label="Thanh toán qua VNPay" disabled={!summary.vnpay_available} />
+                  <div className="flex-1"><button type="button" disabled={!summary.vnpay_available || isSubmitting || isApplyingCoupon} className="cursor-pointer text-left font-semibold text-gray-800" onClick={() => form.setFieldValue('payment_method', 'VNPAY')}>Thanh toán qua VNPay</button><p className="mt-1 text-xs leading-5 text-gray-500">Quét QR, thẻ ATM hoặc tài khoản ngân hàng</p></div>
                   <span className="shrink-0 text-base font-black tracking-tight"><span className="text-[#ed1c24]">VN</span><span className="text-[#005baa]">PAY</span></span>
                 </div>
                 <div className={`flex items-center gap-3 rounded-xl border p-4 transition ${paymentMethod === 'COD' ? 'border-primary bg-primary/4' : 'border-gray-200'}`}>
                   <Radio value="COD" aria-label="Thanh toán khi nhận hàng" />
-                  <div className="flex-1"><button type="button" disabled={isSubmitting} className="cursor-pointer text-left font-semibold text-gray-800" onClick={() => form.setFieldValue('payment_method', 'COD')}>Thanh toán khi nhận hàng</button><p className="mt-1 text-xs leading-5 text-gray-500">Thanh toán cho nhân viên giao hàng</p></div>
+                  <div className="flex-1"><button type="button" disabled={isSubmitting || isApplyingCoupon} className="cursor-pointer text-left font-semibold text-gray-800" onClick={() => form.setFieldValue('payment_method', 'COD')}>Thanh toán khi nhận hàng</button><p className="mt-1 text-xs leading-5 text-gray-500">Thanh toán cho nhân viên giao hàng</p></div>
                   <WalletOutlined className="text-2xl text-primary" />
                 </div>
               </Radio.Group>
             </Form.Item>
-            {!preview.vnpay_available && <Alert className="mt-4" type="info" showIcon title="VNPay hiện chưa sẵn sàng. Bạn có thể thanh toán khi nhận hàng." />}
+            {!summary.vnpay_available && <Alert className="mt-4" type="info" showIcon title={summary.total === 0 ? 'Đơn hàng đã được giảm còn 0đ. Vui lòng xác nhận đặt hàng.' : 'VNPay hiện chưa sẵn sàng. Bạn có thể thanh toán khi nhận hàng.'} />}
           </section>
 
           <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-5">
@@ -178,10 +208,11 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
         </div>
 
         <div className="min-w-0 lg:sticky lg:top-6">
-          <OrderSummary summary={preview} address={selectedAddress?.address_line}>
+          <OrderSummary summary={summary} address={selectedAddress?.address_line}
+            couponInput={<CouponInput coupon={summary.coupon} isLoading={isApplyingCoupon} disabled={isSubmitting} error={couponError} onApply={applyCoupon} />}>
             {submitError && <Alert className="mb-4" type="error" showIcon title={submitError} action={<Button size="small" onClick={onReload}>Kiểm tra lại</Button>} />}
             <div className="[&_button]:h-12">
-              <PrimaryButton htmlType="submit" loading={isSubmitting} disabled={!selectedAddress}>
+              <PrimaryButton htmlType="submit" loading={isSubmitting} disabled={!selectedAddress || isApplyingCoupon}>
                 {paymentMethod === 'VNPAY' ? <span><CreditCardOutlined className="mr-2" />Tiếp tục với VNPay</span> : 'Xác nhận đặt hàng'}
               </PrimaryButton>
             </div>

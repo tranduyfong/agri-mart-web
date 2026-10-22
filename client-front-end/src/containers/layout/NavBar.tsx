@@ -3,9 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { App, Button, Drawer, Dropdown, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-  BellOutlined,
+  TruckOutlined,
   DownOutlined,
-  GlobalOutlined,
   HeartOutlined,
   LogoutOutlined,
   MenuOutlined,
@@ -14,21 +13,15 @@ import {
 } from '@ant-design/icons';
 import Logo from '../../components/Logo';
 import IconButton from '../../components/IconButton';
-import useCategories from '../../hooks/useCategories';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { logout } from '../../store/slices/authSlice';
 import { clearAuth } from '../../utils/authStorage';
 import { NAV_LINKS, ROUTES } from '../../utils/constants';
 
-// Danh sách ngôn ngữ (hiện tại chỉ là giao diện, chưa đổi ngôn ngữ thật)
-const LANGUAGE_ITEMS: MenuProps['items'] = [
-  { key: 'vi', label: 'Tiếng Việt' },
-  { key: 'en', label: 'Tiếng Anh' },
-];
-
 // Menu khi bấm vào tên người dùng (đã đăng nhập)
 const USER_MENU_ITEMS: MenuProps['items'] = [
   { key: ROUTES.ACCOUNT, label: 'Thông tin cá nhân', icon: <UserOutlined /> },
+  { key: ROUTES.ORDERS, label: 'Theo dõi đơn hàng', icon: <TruckOutlined /> },
   { key: ROUTES.ACCOUNT_ADDRESSES, label: 'Sổ địa chỉ' },
   { key: ROUTES.ACCOUNT_PASSWORD, label: 'Đổi mật khẩu' },
   { type: 'divider' },
@@ -40,7 +33,7 @@ const getNavLinkClass = ({ isActive }: { isActive: boolean }) => {
   return isActive ? 'text-primary' : 'text-gray-800 hover:text-primary';
 };
 
-// Thanh điều hướng: logo, menu, các nút giỏ hàng / yêu thích / thông báo, ngôn ngữ, nút đăng nhập
+// Thanh điều hướng và các lối tắt mua sắm.
 const NavBar = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -48,29 +41,41 @@ const NavBar = () => {
   const user = useAppSelector((state) => state.auth.user); // null nếu chưa đăng nhập
   const { cart, wishlist, cartVersion, wishlistVersion } = useAppSelector((state) => state.shopping);
   const cartCount = Math.round(cart.reduce((total, item) => total + item.quantity, 0) * 1000) / 1000;
-  const { categories } = useCategories();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Menu danh mục lấy từ API, key là đường dẫn tới trang cửa hàng đã lọc theo danh mục đó
-  const categoryMenuItems: MenuProps['items'] = categories.map((category) => ({
-    key: `${ROUTES.SHOP}?category_id=${category.id}`,
-    label: category.name,
-  }));
 
   // Menu hiển thị trong ngăn kéo (Drawer) khi xem trên điện thoại
   const mobileMenuItems: MenuProps['items'] = [
     { key: NAV_LINKS[0].path, label: NAV_LINKS[0].label },
-    { key: 'category', label: 'Danh mục', children: categoryMenuItems },
     { key: NAV_LINKS[1].path, label: NAV_LINKS[1].label },
     { key: NAV_LINKS[2].path, label: NAV_LINKS[2].label },
-    { key: ROUTES.CART, label: `Giỏ hàng (${cartCount})`, icon: <ShoppingCartOutlined /> },
-    { key: ROUTES.WISHLIST, label: `Yêu thích (${wishlist.length})`, icon: <HeartOutlined /> },
-    ...(user ? [{ key: ROUTES.ACCOUNT, label: 'Tài khoản của tôi', icon: <UserOutlined /> }] : []),
+    {
+      key: ROUTES.CART,
+      label: `Giỏ hàng (${cartCount})`,
+      icon: <ShoppingCartOutlined />,
+    },
+    {
+      key: ROUTES.WISHLIST,
+      label: `Yêu thích (${wishlist.length})`,
+      icon: <HeartOutlined />,
+    },
+    { key: ROUTES.ORDERS, label: 'Theo dõi đơn hàng', icon: <TruckOutlined /> },
+    ...(user
+      ? [
+          {
+            key: ROUTES.ACCOUNT,
+            label: 'Tài khoản của tôi',
+            icon: <UserOutlined />,
+          },
+        ]
+      : []),
   ];
 
   // Bấm vào 1 mục trong menu người dùng
   const handleUserMenuClick: MenuProps['onClick'] = (item) => {
-    if (item.key.startsWith('/')) { navigate(item.key); return; }
+    if (item.key.startsWith('/')) {
+      navigate(item.key);
+      return;
+    }
     if (item.key === 'logout') {
       clearAuth(); // Xóa thông tin đăng nhập trong localStorage
       dispatch(logout()); // Xóa thông tin đăng nhập trong Redux
@@ -90,19 +95,15 @@ const NavBar = () => {
   return (
     <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-4">
-        <div className="[&_span]:text-base [&_svg]:h-6 [&_svg]:w-6 sm:[&_span]:text-xl sm:[&_svg]:h-7 sm:[&_svg]:w-7"><Logo /></div>
+        <div className="[&_span]:text-base [&_svg]:h-6 [&_svg]:w-6 sm:[&_span]:text-xl sm:[&_svg]:h-7 sm:[&_svg]:w-7">
+          <Logo />
+        </div>
 
         {/* Menu chính, chỉ hiện trên màn hình lớn */}
         <nav className="hidden items-center gap-10 text-sm lg:flex font-bold">
           <NavLink to={ROUTES.HOME} end className={getNavLinkClass}>
             Trang chủ
           </NavLink>
-
-          <Dropdown menu={{ items: categoryMenuItems, onClick: (item) => navigate(item.key) }}>
-            <button type="button" className="flex cursor-pointer items-center gap-1 text-gray-800 hover:text-primary">
-              Danh mục <DownOutlined className="text-xs" />
-            </button>
-          </Dropdown>
 
           <NavLink to={ROUTES.SHOP} className={getNavLinkClass}>
             Cửa hàng
@@ -116,18 +117,24 @@ const NavBar = () => {
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Giỏ và yêu thích luôn hiện, kể cả trên điện thoại để nhìn thấy số vừa thêm */}
           <div className="flex items-center gap-0 sm:gap-2" aria-live="polite">
-            <IconButton icon={<ShoppingCartOutlined />} label={`Giỏ hàng (${cartCount})`} count={cartCount} pulseKey={cartVersion} shoppingTarget="cart" onClick={() => navigate(ROUTES.CART)} />
-            <IconButton icon={<HeartOutlined />} label={`Yêu thích (${wishlist.length})`} count={wishlist.length} pulseKey={wishlistVersion} shoppingTarget="wishlist" onClick={() => navigate(ROUTES.WISHLIST)} />
+            <IconButton
+              icon={<ShoppingCartOutlined />}
+              label={`Giỏ hàng (${cartCount})`}
+              count={cartCount}
+              pulseKey={cartVersion}
+              shoppingTarget="cart"
+              onClick={() => navigate(ROUTES.CART)}
+            />
+            <IconButton
+              icon={<HeartOutlined />}
+              label={`Yêu thích (${wishlist.length})`}
+              count={wishlist.length}
+              pulseKey={wishlistVersion}
+              shoppingTarget="wishlist"
+              onClick={() => navigate(ROUTES.WISHLIST)}
+            />
           </div>
-          <div className="hidden items-center gap-2 sm:flex">
-            <IconButton icon={<BellOutlined />} label="Thông báo" />
-
-            <Dropdown menu={{ items: LANGUAGE_ITEMS }}>
-              <button type="button" className="flex cursor-pointer items-center gap-1 px-2 text-sm font-medium text-gray-800">
-                <GlobalOutlined /> VI <DownOutlined className="text-xs" />
-              </button>
-            </Dropdown>
-          </div>
+          <IconButton icon={<TruckOutlined />} label="Theo dõi đơn hàng" onClick={() => navigate(ROUTES.ORDERS)} />
 
           {/* Đã đăng nhập: hiện tên người dùng. Chưa đăng nhập: hiện nút Đăng nhập */}
           {user ? (
@@ -142,7 +149,12 @@ const NavBar = () => {
               </button>
             </Dropdown>
           ) : (
-            <Button type="primary" shape="round" className="ml-2 hidden font-semibold sm:inline-flex" onClick={() => navigate(ROUTES.LOGIN)}>
+            <Button
+              type="primary"
+              shape="round"
+              className="ml-2 hidden font-semibold sm:inline-flex"
+              onClick={() => navigate(ROUTES.LOGIN)}
+            >
               Đăng nhập
             </Button>
           )}
@@ -154,15 +166,38 @@ const NavBar = () => {
         </div>
       </div>
 
-      <Drawer
-        title={<Logo />}
-        placement="right"
-        open={isMobileMenuOpen}
-        onClose={() => setIsMobileMenuOpen(false)}
-      >
+      <Drawer title={<Logo />} placement="right" open={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)}>
         <Menu mode="inline" items={mobileMenuItems} onClick={handleMobileMenuClick} className="border-none" />
-        {!user && <Button type="primary" block className="mt-4" onClick={() => { setIsMobileMenuOpen(false); navigate(ROUTES.LOGIN); }}>Đăng nhập</Button>}
-        {user && <div className="mt-5 border-t border-gray-100 pt-4"><p className="mb-3 text-sm font-semibold">{user.full_name}</p><Button block icon={<LogoutOutlined />} onClick={() => { clearAuth(); dispatch(logout()); setIsMobileMenuOpen(false); navigate(ROUTES.LOGIN); }}>Đăng xuất</Button></div>}
+        {!user && (
+          <Button
+            type="primary"
+            block
+            className="mt-4"
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              navigate(ROUTES.LOGIN);
+            }}
+          >
+            Đăng nhập
+          </Button>
+        )}
+        {user && (
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <p className="mb-3 text-sm font-semibold">{user.full_name}</p>
+            <Button
+              block
+              icon={<LogoutOutlined />}
+              onClick={() => {
+                clearAuth();
+                dispatch(logout());
+                setIsMobileMenuOpen(false);
+                navigate(ROUTES.LOGIN);
+              }}
+            >
+              Đăng xuất
+            </Button>
+          </div>
+        )}
       </Drawer>
     </header>
   );

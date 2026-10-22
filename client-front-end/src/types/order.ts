@@ -20,6 +20,7 @@ export interface CheckoutSummary {
   discount_amount: number;
   shipping_fee: number;
   total: number;
+  coupon: { code: string; name: string; discount_amount: number } | null;
 }
 
 export interface CheckoutPreview extends CheckoutSummary {
@@ -29,10 +30,18 @@ export interface CheckoutPreview extends CheckoutSummary {
 export interface CheckoutOrder extends CheckoutSummary {
   checkout_code: string;
   order_codes: string[];
-  payment_method: 'COD' | 'VNPAY';
+  payment_method: 'COD' | 'VNPAY' | 'MOMO';
   payment_status: 'UNPAID' | 'PAID' | 'REFUNDED';
   status: 'PENDING' | 'CONFIRMED' | 'SHIPPING' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
+  updated_at: string;
+  branch_orders: {
+    code: string;
+    branch_name: string;
+    status: CheckoutOrder['status'];
+    payment_status: CheckoutOrder['payment_status'];
+    updated_at: string;
+  }[];
   paid_at: string | null;
   transaction_code: string | null;
   payment_expires_at: string | null;
@@ -53,4 +62,5 @@ export interface CheckoutRequest extends CheckoutFormValues {
   cart_item_ids: string[];
   checkout_key: string;
   expected_total: number;
+  coupon_code?: string;
 }
