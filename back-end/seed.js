@@ -7,13 +7,15 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const connection = require('./src/configs/database.config');
 const User = require('./src/models/user');
-const Branch = require('./src/models/branch');
 const Category = require('./src/models/category');
 const Supplier = require('./src/models/supplier');
 const Product = require('./src/models/product');
 const Promotion = require('./src/models/promotion');
 const Order = require('./src/models/order');
 const GoodsReceipt = require('./src/models/goodsReceipt');
+const ChatRoom = require('./src/models/chatRoom');
+const ChatMessage = require('./src/models/chatMessage');
+const Newsletter = require('./src/models/newsletter');
 
 const getDate = (days) => {
     const date = new Date();
@@ -70,10 +72,7 @@ const seedData = async () => {
     await connection();
 
     // Chờ tạo unique index trước khi thêm dữ liệu.
-    await Promise.all([
-        User.init(), Branch.init(), Category.init(), Supplier.init(),
-        Product.init(), Promotion.init(), Order.init(), GoodsReceipt.init()
-    ]);
+    await Promise.all([User.init(), Category.init(), Supplier.init(), Product.init(), Promotion.init(), Order.init(), GoodsReceipt.init()]);
 
     // Ảnh nằm sẵn trong dự án, không cần tải từ Internet khi chạy seed.
     const imageDirectory = path.join(__dirname, 'uploads/products/demo');
@@ -84,18 +83,6 @@ const seedData = async () => {
         if (!fs.existsSync(destination)) {
             fs.copyFileSync(path.join(__dirname, 'seed-images', file), destination);
         }
-    }
-
-    const branches = [];
-    const branchData = [
-        { code: 'DEMO-CN01', name: 'AgriFood Ba Đình (demo)', address: '12 Đội Cấn, Phường Ba Đình, Thành phố Hà Nội' },
-        { code: 'DEMO-CN02', name: 'AgriFood Ngọc Hà (demo)', address: '25 Ngọc Hà, Phường Ngọc Hà, Thành phố Hà Nội' }
-    ];
-
-    for (const data of branchData) {
-        let branch = await Branch.findOne({ code: data.code });
-        if (!branch) branch = await Branch.create(data);
-        branches.push(branch);
     }
 
     let supplier = await Supplier.findOne({ code: 'DEMO-NCC01' });
@@ -127,14 +114,16 @@ const seedData = async () => {
         let product = await Product.findOne({ code });
 
         if (!product) {
-            const variants = [{
-                sku: code + '-01',
-                name: data.unit === 'kg' ? 'Bán theo kg' : '1 ' + data.unit,
-                unit: data.unit,
-                step_quantity: data.unit === 'kg' ? 0.5 : 1,
-                list_price: data.price,
-                stocks: []
-            }];
+            const variants = [
+                {
+                    sku: code + '-01',
+                    name: data.unit === 'kg' ? 'Bán theo kg' : '1 ' + data.unit,
+                    unit: data.unit,
+                    step_quantity: data.unit === 'kg' ? 0.5 : 1,
+                    list_price: data.price,
+                    stocks: []
+                }
+            ];
 
             if (data.has_pack) {
                 variants.push({
@@ -142,27 +131,23 @@ const seedData = async () => {
                     name: 'Khay 500g',
                     unit: 'khay',
                     step_quantity: 1,
-                    list_price: Math.round(data.price * 0.55 / 1000) * 1000,
+                    list_price: Math.round((data.price * 0.55) / 1000) * 1000,
                     stocks: []
                 });
             }
 
             for (const variant of variants) {
-                for (let branchIndex = 0; branchIndex < branches.length; branchIndex++) {
-                    variant.stocks.push({
-                        branch_id: branches[branchIndex]._id,
-                        batch_code: 'LO-DEMO-MOI',
-                        quantity: data.out_of_stock ? 0 : 30 + index + branchIndex * 10,
-                        manufactured_date: getDate(-2),
-                        expiry_date: getDate(30)
-                    });
-                }
+                variant.stocks.push({
+                    batch_code: 'LO-DEMO-MOI',
+                    quantity: data.out_of_stock ? 0 : 30 + index,
+                    manufactured_date: getDate(-2),
+                    expiry_date: getDate(30)
+                });
             }
 
             // Một lô đã hết hạn để thử việc loại lô cũ khi tính tồn kho.
             if (index === 0) {
                 variants[0].stocks.push({
-                    branch_id: branches[0]._id,
                     batch_code: 'LO-DEMO-HET-HAN',
                     quantity: 5,
                     manufactured_date: getDate(-40),
@@ -175,7 +160,9 @@ const seedData = async () => {
                 code,
                 name: data.name,
                 slug: slugify(data.name + ' ' + code, { lower: true, strict: true, locale: 'vi' }),
-                description: data.name + ' được chọn lọc, phù hợp cho bữa ăn hằng ngày. ' +
+                description:
+                    data.name +
+                    ' được chọn lọc, phù hợp cho bữa ăn hằng ngày. ' +
                     'Bảo quản ở nơi phù hợp với từng loại thực phẩm và sử dụng trước hạn ghi trên bao bì. ' +
                     'Đây là sản phẩm mẫu để thử chức năng của AgriFood Smart.',
                 status: data.status || 'PUBLISHED',
@@ -230,53 +217,120 @@ const seedData = async () => {
                 password_hash: passwordHash,
                 status: 'ACTIVE',
                 email_verified_at: new Date(),
-                permissions: data.role === 'STAFF' ? ['PRODUCT_MANAGE', 'INVENTORY_MANAGE', 'ORDER_MANAGE'] : [],
-                assigned_branches: data.role === 'STAFF' ? [branches[0]._id] : [],
+                permissions:
+                    data.role === 'STAFF'
+                        ? [
+                              'PRODUCT_MANAGE',
+                              'INVENTORY_MANAGE',
+                              'ORDER_MANAGE',
+                              'PROMOTION_MANAGE',
+                              'BANNER_MANAGE',
+                              'NEWSLETTER_MANAGE',
+                              'SUPPORT_MANAGE'
+                          ]
+                        : [],
                 addresses: data.role === 'CUSTOMER' ? addresses : [],
                 wishlist: data.role === 'CUSTOMER' ? [savedProducts[0]._id, savedProducts[8]._id] : [],
-                cart_items: data.role === 'CUSTOMER' ? [
-                    { product_id: savedProducts[0]._id, variant_id: savedProducts[0].variants[0]._id, branch_id: branches[0]._id, quantity: 1 },
-                    { product_id: savedProducts[17]._id, variant_id: savedProducts[17].variants[0]._id, branch_id: branches[0]._id, quantity: 2 }
-                ] : []
+                cart_items:
+                    data.role === 'CUSTOMER'
+                        ? [
+                              { product_id: savedProducts[0]._id, variant_id: savedProducts[0].variants[0]._id, quantity: 1 },
+                              { product_id: savedProducts[17]._id, variant_id: savedProducts[17].variants[0]._id, quantity: 2 }
+                          ]
+                        : []
             });
         }
         users[data.role] = user;
     }
 
+    // Bổ sung các quyền mới cho riêng tài khoản nhân viên demo đã tồn tại.
+    await User.updateOne(
+        { email: 'staff.demo@agrimart.local', role: 'STAFF' },
+        { $addToSet: { permissions: { $each: ['PROMOTION_MANAGE', 'BANNER_MANAGE', 'NEWSLETTER_MANAGE', 'SUPPORT_MANAGE'] } } }
+    );
+    if (!(await Newsletter.exists({ subject: 'DEMO - Ưu đãi rau tươi cuối tuần' }))) {
+        await Newsletter.create({
+            subject: 'DEMO - Ưu đãi rau tươi cuối tuần',
+            content: 'Xin chào bạn,\n\nKhám phá **rau củ tươi** và các ưu đãi mới tại Agri-Mart.',
+            created_by: users.STAFF._id
+        });
+    }
+    if (!(await ChatRoom.exists({ customer_id: users.CUSTOMER._id }))) {
+        const room = await ChatRoom.create({ customer_id: users.CUSTOMER._id });
+        await ChatMessage.create({
+            room_id: room._id,
+            sender_type: 'CUSTOMER',
+            sender_id: users.CUSTOMER._id,
+            content: 'Đây là hội thoại mẫu. Mình muốn được tư vấn cách bảo quản rau tươi.'
+        });
+    }
+
     const promotionData = [
         {
-            code: 'DEMO-FLASH20', name: 'Nông sản tươi mỗi ngày', discount_type: 'PERCENT', discount_value: 20,
-            is_flash_sale: true, valid_from: getDate(-1), valid_to: getDate(7),
+            code: 'DEMO-FLASH20',
+            name: 'Nông sản tươi mỗi ngày',
+            discount_type: 'PERCENT',
+            discount_value: 20,
+            is_flash_sale: true,
+            valid_from: getDate(-1),
+            valid_to: getDate(7),
             product_ids: [savedProducts[0]._id, savedProducts[6]._id, savedProducts[8]._id]
         },
         {
-            code: 'DEMO-FRUIT10', name: 'Ưu đãi trái cây', discount_type: 'PERCENT', discount_value: 10,
-            valid_from: getDate(-1), valid_to: getDate(30),
+            code: 'DEMO-FRUIT10',
+            name: 'Ưu đãi trái cây',
+            discount_type: 'PERCENT',
+            discount_value: 10,
+            valid_from: getDate(-1),
+            valid_to: getDate(30),
             product_ids: savedProducts.slice(1, 6).map((product) => product._id)
         },
         {
-            code: 'DEMO-SHIP15', name: 'Hỗ trợ phí giao hàng', discount_type: 'AMOUNT', discount_value: 15000,
-            promotion_scope: 'SHIPPING', min_order_value: 200000,
-            valid_from: getDate(-1), valid_to: getDate(30), product_ids: []
+            code: 'DEMO-SHIP15',
+            name: 'Hỗ trợ phí giao hàng',
+            discount_type: 'AMOUNT',
+            discount_value: 15000,
+            promotion_scope: 'SHIPPING',
+            min_order_value: 200000,
+            valid_from: getDate(-1),
+            valid_to: getDate(30),
+            product_ids: []
         },
         {
-            code: 'DEMO-EXPIRED', name: 'Khuyến mãi đã hết hạn', discount_type: 'PERCENT', discount_value: 50,
-            valid_from: getDate(-30), valid_to: getDate(-2), product_ids: [savedProducts[0]._id]
+            code: 'DEMO-EXPIRED',
+            name: 'Khuyến mãi đã hết hạn',
+            discount_type: 'PERCENT',
+            discount_value: 50,
+            valid_from: getDate(-30),
+            valid_to: getDate(-2),
+            product_ids: [savedProducts[0]._id]
         },
         {
-            code: 'DEMO-GIAM10', name: 'Giảm thêm 10% tiền hàng', discount_type: 'PERCENT', discount_value: 10,
-            requires_code: true, min_order_value: 100000,
-            valid_from: getDate(-1), valid_to: getDate(30), product_ids: []
+            code: 'DEMO-GIAM10',
+            name: 'Giảm thêm 10% tiền hàng',
+            discount_type: 'PERCENT',
+            discount_value: 10,
+            requires_code: true,
+            min_order_value: 100000,
+            valid_from: getDate(-1),
+            valid_to: getDate(30),
+            product_ids: []
         },
         {
-            code: 'DEMO-GIAM30', name: 'Giảm 30.000đ tiền hàng', discount_type: 'AMOUNT', discount_value: 30000,
-            requires_code: true, min_order_value: 300000,
-            valid_from: getDate(-1), valid_to: getDate(30), product_ids: []
+            code: 'DEMO-GIAM30',
+            name: 'Giảm 30.000đ tiền hàng',
+            discount_type: 'AMOUNT',
+            discount_value: 30000,
+            requires_code: true,
+            min_order_value: 300000,
+            valid_from: getDate(-1),
+            valid_to: getDate(30),
+            product_ids: []
         }
     ];
 
     for (const data of promotionData) {
-        if (!await Promotion.exists({ code: data.code })) await Promotion.create(data);
+        if (!(await Promotion.exists({ code: data.code }))) await Promotion.create(data);
     }
 
     // Đơn hoàn tất giúp thử bộ lọc bán chạy và xu hướng trên trang chủ.
@@ -305,7 +359,6 @@ const seedData = async () => {
         await Order.create({
             code: data.code,
             user_id: users.CUSTOMER._id,
-            branch_id: branches[0]._id,
             total_amount: totalAmount,
             shipping_fee: 15000,
             discount_amount: 0,
@@ -319,15 +372,14 @@ const seedData = async () => {
         });
     }
 
-    for (const branch of branches) {
+    if (!(await GoodsReceipt.exists({ note: 'DEMO - Phiếu nhập dữ liệu mẫu' }))) {
         const note = 'DEMO - Phiếu nhập dữ liệu mẫu';
-        if (await GoodsReceipt.exists({ branch_id: branch._id, note })) continue;
 
         const items = [];
         for (const product of savedProducts) {
             for (const variant of product.variants) {
                 for (const stock of variant.stocks) {
-                    if (!stock.branch_id.equals(branch._id) || stock.quantity <= 0) continue;
+                    if (stock.quantity <= 0) continue;
 
                     items.push({
                         product_id: product._id,
@@ -343,7 +395,6 @@ const seedData = async () => {
         }
 
         await GoodsReceipt.create({
-            branch_id: branch._id,
             supplier_id: supplier._id,
             created_by: users.ADMIN._id,
             total_amount: items.reduce((total, item) => total + item.quantity * item.unit_cost, 0),
@@ -352,7 +403,7 @@ const seedData = async () => {
         });
     }
 
-    console.log('Đã nạp dữ liệu mẫu: 12 danh mục, 26 sản phẩm, 2 cơ sở, 6 khuyến mãi và 3 đơn hàng.');
+    console.log('Đã nạp dữ liệu mẫu: 12 danh mục, 26 sản phẩm, một kho chung, 6 khuyến mãi và 3 đơn hàng.');
     console.log('Khách hàng: customer.demo@agrimart.local');
     console.log('Nhân viên: staff.demo@agrimart.local');
     console.log('Quản trị viên: admin.demo@agrimart.local');

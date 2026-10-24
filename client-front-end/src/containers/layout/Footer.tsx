@@ -1,4 +1,7 @@
-import type { SubmitEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
+import { App } from 'antd';
+import contentService from '../../services/contentService';
+import { getErrorMessage } from '../../utils/errorMessage';
 import { SendOutlined } from '@ant-design/icons';
 import Logo from '../../components/Logo';
 import FooterLinkGroup from '../../components/FooterLinkGroup';
@@ -7,10 +10,23 @@ import { FOOTER_LINK_GROUPS, STORE_INFO } from '../../utils/constants';
 // Chân trang: giới thiệu, các cột link, đăng ký nhận tin, bản quyền
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [email, setEmail] = useState('');
+  const [subscribing, setSubscribing] = useState(false);
+  const { message } = App.useApp();
 
-  // Đăng ký nhận tin (tạm thời chưa có API)
-  const handleSubscribe = (event: SubmitEvent<HTMLFormElement>) => {
+  const handleSubscribe = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (subscribing) return;
+    setSubscribing(true);
+    try {
+      await contentService.subscribe(email.trim());
+      setEmail('');
+      void message.success('Đã đăng ký nhận bản tin.');
+    } catch (error) {
+      void message.error(getErrorMessage(error));
+    } finally {
+      setSubscribing(false);
+    }
   };
 
   return (
@@ -41,11 +57,16 @@ const Footer = () => {
             <form onSubmit={handleSubscribe} className="mt-6 flex items-center gap-2 rounded-lg bg-gray-100 p-2">
               <input
                 type="email"
+                required
+                maxLength={254}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 placeholder="Địa chỉ email của bạn"
                 className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
               />
               <button
                 type="submit"
+                disabled={subscribing}
                 aria-label="Đăng ký nhận tin"
                 className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md bg-primary text-white hover:bg-primary-dark"
               >

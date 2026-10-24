@@ -27,13 +27,13 @@ const OrderCard = ({ order }: { order: CheckoutOrder }) => {
       <div className="py-6">
         <DeliveryProgress status={order.status} />
       </div>
-      {order.branch_orders.length > 1 && (
+      {order.orders.length > 1 && (
         <div className="mb-5 rounded-xl bg-gray-50 p-4 text-sm">
           <p className="mb-2 font-semibold">Tiến độ từng kiện hàng</p>
-          {order.branch_orders.map((branch) => (
-            <div key={branch.code} className="mt-2 flex flex-wrap justify-between gap-2">
-              <span>{branch.branch_name}</span>
-              <Tag color={ORDER_STATUSES[branch.status].color}>{ORDER_STATUSES[branch.status].label}</Tag>
+          {order.orders.map((entry) => (
+            <div key={entry.code} className="mt-2 flex flex-wrap justify-between gap-2">
+              <span>{entry.code}</span>
+              <Tag color={ORDER_STATUSES[entry.status].color}>{ORDER_STATUSES[entry.status].label}</Tag>
             </div>
           ))}
         </div>
@@ -81,12 +81,15 @@ const OrderCard = ({ order }: { order: CheckoutOrder }) => {
             {PAYMENT_METHODS[order.payment_method]} · {PAYMENT_STATUSES[order.payment_status]}
           </p>
           <p className="mt-2 text-sm text-gray-500">
-            Tổng cộng <span className="ml-2 text-xl font-bold text-primary">{formatPrice(order.total)}</span>
+            Tổng cộng{' '}
+            <span className="ml-2 text-xl font-bold text-primary">
+              {formatPrice(order.payment_method === 'COD' ? (order.amount_due ?? order.total) : order.total)}
+            </span>
           </p>
         </div>
         <Link to={getOrderResultPath(order.checkout_code)}>
           <Button type="primary" icon={<RightOutlined />} iconPlacement="end">
-            Xem chi tiết
+            {order.can_pay ? 'Thanh toán VNPay' : 'Xem chi tiết'}
           </Button>
         </Link>
       </div>

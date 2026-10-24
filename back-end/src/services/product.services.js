@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const slugify = require('slugify');
 const Product = require('../models/product');
 const Category = require('../models/category');
-const Branch = require('../models/branch');
 const Supplier = require('../models/supplier');
 const Promotion = require('../models/promotion');
 const Order = require('../models/order');
@@ -12,6 +11,7 @@ const { recommendProducts } = require('../utils/recommendation.util');
 const { getToday, parseDate } = require('../utils/date.util');
 const { availableStock } = require('../utils/productStock.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
+const { getAllocationCost } = require('../utils/report.util');
 
 const createSlug = (name, code) => {
     return slugify(name + ' ' + code, { lower: true, strict: true, locale: 'vi' });
@@ -60,7 +60,10 @@ const getProducts = async (filters, pagination) => {
     const searchScores = {};
     if (filters.keyword) {
         products = products.filter((product) => {
-            const score = getSearchScore(filters.keyword, product);
+            const score = getSearchScore(filters.keyword, {
+                ...product,
+                code: product.code + ' ' + product.variants.map((variant) => variant.sku).join(' ')
+            });
             searchScores[product._id.toString()] = score;
             return score !== null;
         });
@@ -93,12 +96,15 @@ const getProducts = async (filters, pagination) => {
         if (filters.on_sale && !offers.length) continue;
 
         const variants = [...product.variants].sort((a, b) => a.list_price - b.list_price);
-        const percentOffers = offers.filter((promotion) => promotion.discount_type === 'PERCENT' && promotion.promotion_scope === 'PRODUCT' && !promotion.requires_code);
+        const percentOffers = offers.filter(
+            (promotion) => promotion.discount_type === 'PERCENT' && promotion.promotion_scope === 'PRODUCT' && !promotion.requires_code
+        );
         const stock = variants.reduce((total, variant) => total + availableStock(variant), 0);
 
         result.push({
             id,
             code: product.code,
+            skus: variants.map((variant) => variant.sku),
             name: product.name,
             slug: product.slug,
             status: product.status,
@@ -166,6 +172,7 @@ const getProductDetail = async ({ id, slug, onlyPublished }) => {
     if (!product) throw new Error('PRODUCT_NOT_FOUND');
 
     const discounts = await getProductDiscounts([product._id]);
+    const receipts = onlyPublished ? [] : await GoodsReceipt.find({ 'items.product_id': product._id }).lean();
 
     return {
         id: product._id.toString(),
@@ -185,7 +192,17 @@ const getProductDetail = async ({ id, slug, onlyPublished }) => {
             unit: variant.unit,
             step_quantity: variant.step_quantity,
             list_price: variant.list_price,
-            stock_quantity: availableStock(variant)
+            stock_quantity: availableStock(variant),
+            ...(!onlyPublished
+                ? {
+                      stock_lots: variant.stocks.map((stock) => ({
+                          batch_code: stock.batch_code,
+                          quantity: stock.quantity,
+                          expiry_date: stock.expiry_date,
+                          unit_cost: getAllocationCost(stock, { product_id: product._id, variant_sku: variant.sku }, receipts, new Date())
+                      }))
+                  }
+                : {})
         })),
         images: product.images.map((url, index) => ({ id: url, url, is_thumbnail: index === 0 ? 1 : 0 }))
     };
@@ -203,6 +220,7 @@ const getVariantData = (variant) => {
 
 const checkVariants = (product) => {
     if (product.status === 'PUBLISHED' && !product.variants.length) throw new Error('PRODUCT_HAS_NO_VARIANT');
+    if (product.status === 'PUBLISHED' && !product.images.length) throw new Error('PRODUCT_HAS_NO_IMAGE');
 
     const skus = product.variants.map((variant) => variant.sku);
     if (new Set(skus).size !== skus.length) {
@@ -228,21 +246,77 @@ const createProduct = async (data) => {
     }
     if (data.variants !== undefined && !Array.isArray(data.variants)) throw new Error('INVALID_PRODUCT_DATA');
 
-    const product = new Product({
-        category_id: data.category_id,
-        code: data.code,
-        name: data.name,
-        slug: createSlug(data.name, data.code),
-        description: data.description || '',
-        status: data.status || 'DRAFT',
-        variants: (data.variants || []).map(getVariantData)
+    // Lưu sản phẩm, tồn ban đầu và phiếu nhập trong cùng một transaction.
+    return mongoose.connection.transaction(async (session) => {
+        const product = new Product({
+            category_id: data.category_id,
+            code: data.code,
+            name: data.name,
+            slug: createSlug(data.name, data.code),
+            description: data.description || '',
+            status: data.status || 'DRAFT',
+            variants: (data.variants || []).map(getVariantData)
+        });
+
+        addImages(product, data);
+        checkVariants(product);
+        const receipt = new GoodsReceipt({
+            created_by: data.user_id,
+            note: 'Nhập tồn ban đầu khi tạo sản phẩm',
+            items: []
+        });
+        for (let index = 0; index < product.variants.length; index++) {
+            const stock = data.variants[index].initial_stock;
+            if (!stock) continue;
+            if (!Number.isFinite(stock.quantity) || stock.quantity < 0) throw new Error('INVALID_PRODUCT_DATA');
+            if (stock.quantity === 0) continue;
+            if (!data.can_import) throw new Error('INVENTORY_PERMISSION_REQUIRED');
+            if (!data.user_id) throw new Error('INVALID_PRODUCT_DATA');
+            const variant = product.variants[index];
+            await validateImportRows(
+                [
+                    {
+                        ...stock,
+                        sku: variant.sku,
+                        code: product.code,
+                        name: product.name,
+                        variant_name: variant.name,
+                        category_id: product.category_id,
+                        list_price: variant.list_price,
+                        step_quantity: variant.step_quantity
+                    }
+                ],
+                session
+            );
+            const batchCode = typeof stock.batch_code === 'string' ? stock.batch_code.trim() : '';
+            if (!batchCode || batchCode.length > 100) throw new Error('INVALID_PRODUCT_DATA');
+            variant.stocks.push({
+                batch_code: batchCode,
+                quantity: stock.quantity,
+                manufactured_date: parseDate(stock.manufactured_date),
+                expiry_date: parseDate(stock.expiry_date)
+            });
+            receipt.items.push({
+                product_id: product._id,
+                name: product.name,
+                unit: variant.unit,
+                variant_sku: variant.sku,
+                batch_code: batchCode,
+                quantity: stock.quantity,
+                unit_cost: stock.unit_cost,
+                manufactured_date: parseDate(stock.manufactured_date),
+                expiry_date: parseDate(stock.expiry_date)
+            });
+            receipt.total_amount += stock.quantity * stock.unit_cost;
+        }
+        await product.save({ session });
+        if (receipt.items.length) {
+            receipt.total_amount = Math.round(receipt.total_amount);
+            await receipt.save({ session });
+        }
+
+        return { productId: product._id.toString(), slug: product.slug };
     });
-
-    checkVariants(product);
-    addImages(product, data);
-    await product.save();
-
-    return { productId: product._id.toString(), slug: product.slug };
 };
 
 const updateProduct = async (data) => {
@@ -278,8 +352,8 @@ const updateProduct = async (data) => {
     if (removedImages.some((url) => !product.images.includes(url))) throw new Error('IMAGE_NOT_FOUND');
 
     product.images = product.images.filter((url) => !removedImages.includes(url));
-    checkVariants(product);
     addImages(product, data);
+    checkVariants(product);
     await product.save();
 
     // Chỉ xóa ảnh nội bộ sau khi cập nhật thành công và ảnh không còn được dùng.
@@ -307,9 +381,12 @@ const validateImportRows = async (items, session) => {
             item.quantity <= 0 ||
             !Number.isFinite(item.unit_cost) ||
             item.unit_cost < 0 ||
+            !Number.isSafeInteger(item.unit_cost) ||
             Math.abs(item.quantity * 1000 - Math.round(item.quantity * 1000)) > 0.00001 ||
             !parseDate(item.expiry_date) ||
+            item.expiry_date < getToday() ||
             (item.manufactured_date && !parseDate(item.manufactured_date)) ||
+            (item.manufactured_date && item.manufactured_date > getToday()) ||
             (item.manufactured_date && item.manufactured_date > item.expiry_date)
         ) {
             errors.push({ row, message: 'SKU, số lượng, đơn giá hoặc ngày sản xuất/hạn sử dụng không hợp lệ' });
@@ -343,19 +420,31 @@ const validateImportRows = async (items, session) => {
 };
 
 const importGoods = async (data) => {
-    const { items, branch_id, supplier_id, note, user_id } = data;
-    if (!mongoose.isObjectIdOrHexString(branch_id) || !(await Branch.exists({ _id: branch_id }))) throw new Error('BRANCH_NOT_FOUND');
+    const { items, supplier_id, note, user_id } = data;
     if (supplier_id && (!mongoose.isObjectIdOrHexString(supplier_id) || !(await Supplier.exists({ _id: supplier_id }))))
         throw new Error('SUPPLIER_NOT_FOUND');
     if (!Array.isArray(items) || !items.length) throw new Error('INVALID_PRODUCT_DATA');
+    if (items.length > 1000) throw new Error('INVALID_PRODUCT_DATA');
 
     // Phiếu nhập và các lô hàng phải được lưu cùng nhau: có lỗi thì hủy toàn bộ.
     return mongoose.connection.transaction(async (session) => {
+        if (data.import_key) {
+            const existing = await GoodsReceipt.findOne({ created_by: user_id, import_key: data.import_key }).session(session);
+            if (existing)
+                return {
+                    receipt_id: existing._id.toString(),
+                    already_imported: true,
+                    created_products: 0,
+                    created_variants: 0,
+                    total_amount: existing.total_amount
+                };
+        }
         await validateImportRows(items, session);
         const receipt = new GoodsReceipt({
-            branch_id,
             supplier_id: supplier_id || null,
             created_by: user_id,
+            import_key: data.import_key || null,
+            source_file: data.source_file || '',
             note: note || ''
         });
         let createdProducts = 0;
@@ -374,7 +463,7 @@ const importGoods = async (data) => {
                         name: item.name,
                         slug: createSlug(item.name, item.code),
                         description: item.description || '',
-                        status: 'PUBLISHED'
+                        status: 'DRAFT'
                     });
                     createdProducts++;
                 }
@@ -385,7 +474,7 @@ const importGoods = async (data) => {
             }
 
             const batchCode = item.batch_code || 'LO-' + getToday().replace(/-/g, '');
-            let stock = variant.stocks.find((lot) => lot.branch_id.toString() === branch_id.toString() && lot.batch_code === batchCode);
+            let stock = variant.stocks.find((lot) => lot.batch_code === batchCode);
 
             if (stock) {
                 if (
@@ -399,7 +488,6 @@ const importGoods = async (data) => {
                 stock.quantity = Math.round((stock.quantity + item.quantity) * 1000) / 1000;
             } else {
                 variant.stocks.push({
-                    branch_id,
                     batch_code: batchCode,
                     quantity: item.quantity,
                     manufactured_date: parseDate(item.manufactured_date),
@@ -411,6 +499,8 @@ const importGoods = async (data) => {
             await product.save({ session });
             receipt.items.push({
                 product_id: product._id,
+                name: product.name,
+                unit: variant.unit,
                 variant_sku: variant.sku,
                 batch_code: batchCode,
                 quantity: item.quantity,

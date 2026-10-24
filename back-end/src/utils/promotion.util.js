@@ -32,7 +32,7 @@ const calculateCouponDiscount = (promotion, items, shippingFee, now = new Date()
     };
 };
 
-// Chia số tiền giảm cho các cơ sở, giữ tổng chính xác đến từng đồng.
+// Chia số tiền giảm theo các phần tiền hợp lệ, giữ tổng chính xác đến từng đồng.
 const allocateDiscount = (discount, amounts) => {
     let remainingDiscount = discount;
     let remainingAmount = amounts.reduce((total, amount) => total + amount, 0);

@@ -1,0 +1,14 @@
+{
+  "name": "agri-mart-web",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix back-end run dev",
+    "dev:backend": "npm --prefix back-end run dev",
+    "dev:client": "npm --prefix client-front-end run dev",
+    "dev:staff": "npm --prefix staff-front-end run dev",
+    "dev:admin": "npm --prefix admin-front-end run dev"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -2,10 +2,14 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const goodsReceiptSchema = new Schema({
-    branch_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Branch',
-        required: true
+    import_key: {
+        type: String,
+        default: null
+    },
+
+    source_file: {
+        type: String,
+        default: ''
     },
 
     supplier_id: {
@@ -44,6 +48,16 @@ const goodsReceiptSchema = new Schema({
                 required: true
             },
 
+            name: {
+                type: String,
+                default: ''
+            },
+
+            unit: {
+                type: String,
+                default: ''
+            },
+
             batch_code: {
                 type: String,
                 required: true
@@ -79,6 +93,10 @@ const goodsReceiptSchema = new Schema({
     }
 });
 
-goodsReceiptSchema.index({ branch_id: 1, created_at: -1 });
+goodsReceiptSchema.index({ created_at: -1 });
+goodsReceiptSchema.index({ created_by: 1, import_key: 1 }, {
+    unique: true,
+    partialFilterExpression: { import_key: { $type: 'string' } }
+});
 
 module.exports = mongoose.model('GoodsReceipt', goodsReceiptSchema);

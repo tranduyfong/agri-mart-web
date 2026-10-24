@@ -1,5 +1,6 @@
 // 1 chương trình khuyến mãi đang diễn ra (GET /api/promotion/active)
 export interface Promotion {
+  image_url?: string | null;
   id: string;
   code: string;
   name: string;

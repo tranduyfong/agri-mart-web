@@ -28,6 +28,8 @@ export interface CheckoutPreview extends CheckoutSummary {
 }
 
 export interface CheckoutOrder extends CheckoutSummary {
+  cancelled_amount: number;
+  amount_due: number;
   checkout_code: string;
   order_codes: string[];
   payment_method: 'COD' | 'VNPAY' | 'MOMO';
@@ -35,9 +37,8 @@ export interface CheckoutOrder extends CheckoutSummary {
   status: 'PENDING' | 'CONFIRMED' | 'SHIPPING' | 'COMPLETED' | 'CANCELLED';
   created_at: string;
   updated_at: string;
-  branch_orders: {
+  orders: {
     code: string;
-    branch_name: string;
     status: CheckoutOrder['status'];
     payment_status: CheckoutOrder['payment_status'];
     updated_at: string;
@@ -45,6 +46,9 @@ export interface CheckoutOrder extends CheckoutSummary {
   paid_at: string | null;
   transaction_code: string | null;
   payment_expires_at: string | null;
+  confirmed_at: string | null;
+  payment_ready_at: string | null;
+  can_pay: boolean;
   shipping_address: Omit<UserAddress, 'id' | 'is_default'> & { email: string };
   note: string;
 }

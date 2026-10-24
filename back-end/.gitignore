@@ -6,4 +6,5 @@ uploads/*
 !uploads/.gitkeep
 *.log
 coverage/
+backups/
 test

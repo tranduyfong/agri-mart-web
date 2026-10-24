@@ -3,6 +3,7 @@ const productController = require('../controllers/product.controllers');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/permission.middleware');
 const { uploadImages } = require('../middlewares/upload.middleware');
+const { loadStaffContext } = require('../middlewares/staff.middleware');
 
 const router = express.Router();
 
@@ -23,11 +24,11 @@ router.get('/manage', verifyToken, requirePermission('PRODUCT_MANAGE'), productC
 router.get('/manage/:id', verifyToken, requirePermission('PRODUCT_MANAGE'), productController.getManageProductDetail);
 
 // 4. Thêm sản phẩm thủ công (Bao gồm text và upload nhiều ảnh ở field "images")
-router.post('/', verifyToken, requirePermission('PRODUCT_MANAGE'), uploadImages, productController.addProduct);
+router.post('/', verifyToken, requirePermission('PRODUCT_MANAGE'), loadStaffContext, uploadImages, productController.addProduct);
 
-// 5. Nhập hàng: FE đọc file Excel rồi gửi danh sách dạng JSON { branch_id, supplier_id, note, items: [...] }
+// 5. Nhập hàng: FE đọc file Excel rồi gửi danh sách dạng JSON { supplier_id, note, items: [...] }
 //    SKU chưa có -> tạo sản phẩm mới, SKU đã có -> cộng thêm số lượng tồn kho
-router.post('/import', verifyToken, requirePermission('PRODUCT_MANAGE'), productController.importGoods);
+router.post('/import', verifyToken, requirePermission('INVENTORY_MANAGE'), loadStaffContext, productController.importGoods);
 
 // 6. Chỉnh sửa sản phẩm (thông tin, trạng thái, giá, thêm ảnh ở field "images", xóa ảnh)
 router.put('/:id', verifyToken, requirePermission('PRODUCT_MANAGE'), uploadImages, productController.updateProduct);

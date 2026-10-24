@@ -1,6 +1,6 @@
 import type { ProductListItem } from './product';
 
-// Một dòng giỏ hàng ứng với một quy cách tại một chi nhánh
+// Một dòng giỏ hàng ứng với một quy cách bán
 export interface CartItem {
   id: string;
   product_id: string;
@@ -18,8 +18,6 @@ export interface CartItem {
   stock_quantity: number;
   discount_percent: number | null;
   thumbnail_url: string | null;
-  branch_id: string;
-  branch_name: string;
 }
 
 export type ShoppingMutation =

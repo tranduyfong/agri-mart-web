@@ -28,7 +28,7 @@ export interface ProductListItem {
   min_price: number | null; // Giá của quy cách rẻ nhất
   max_price: number | null;
   unit: string | null; // Đơn vị của quy cách rẻ nhất (kg, hộp, bó...)
-  total_stock: number; // Tồn kho còn hạn sử dụng, cộng tất cả chi nhánh
+  total_stock: number; // Tồn kho còn hạn sử dụng, cộng tất cả lô hàng
   thumbnail_url: string | null;
   sold_quantity: number;
   sold_last_30_days: number;

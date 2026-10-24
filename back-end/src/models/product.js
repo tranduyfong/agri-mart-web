@@ -1,13 +1,7 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-const stockByBranchSubSchema = new Schema({
-    branch_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Branch',
-        required: true
-    },
-
+const stockSubSchema = new Schema({
     batch_code: {
         type: String,
         required: true
@@ -61,7 +55,7 @@ const variantSubSchema = new Schema({
         min: 0
     },
 
-    stocks: [stockByBranchSubSchema]
+    stocks: [stockSubSchema]
 }, { id: false });
 
 const productSchema = new Schema({

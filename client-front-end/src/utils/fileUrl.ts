@@ -5,5 +5,6 @@ const SERVER_URL = import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '');
 // -> ghép với địa chỉ server để hiển thị: "http://localhost:8000/uploads/products/abc.png"
 export const getFileUrl = (path: string | null) => {
   if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
   return `${SERVER_URL}/${path}`;
 };

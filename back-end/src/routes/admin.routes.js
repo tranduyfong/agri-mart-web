@@ -1,0 +1,16 @@
+const express = require('express');
+const controller = require('../controllers/admin.controllers');
+const { verifyToken, verifyAdmin } = require('../middlewares/auth.middleware');
+const router = express.Router();
+router.use(verifyToken, verifyAdmin);
+router.get('/session', controller.getSession);
+router.get('/lookups', controller.getLookups);
+router.get('/accounts', controller.getAccounts);
+router.get('/accounts/:id', controller.getAccount);
+router.post('/accounts', controller.createStaff);
+router.put('/accounts/:id', controller.updateAccount);
+router.patch('/accounts/:id/lock', controller.setAccountLock);
+router.put('/accounts/:id/permissions', controller.savePermissions);
+router.get('/reports/revenue', controller.getRevenue);
+router.get('/reports/inventory', controller.getInventoryReport);
+module.exports = router;

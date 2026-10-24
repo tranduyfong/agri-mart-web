@@ -135,13 +135,6 @@ const userSchema = new Schema({
 
     addresses: [addressSubSchema],
 
-    assigned_branches: [
-        {
-            type: Schema.Types.ObjectId,
-            ref: 'Branch'
-        }
-    ],
-
     // Giữ các tính năng giỏ hàng và yêu thích hiện có cùng tài khoản.
     cart_items: [
         {
@@ -153,12 +146,6 @@ const userSchema = new Schema({
 
             variant_id: {
                 type: Schema.Types.ObjectId,
-                required: true
-            },
-
-            branch_id: {
-                type: Schema.Types.ObjectId,
-                ref: 'Branch',
                 required: true
             },
 

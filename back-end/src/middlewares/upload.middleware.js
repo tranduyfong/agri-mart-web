@@ -9,9 +9,9 @@ const storage = multer.diskStorage({
         let folder = 'uploads/'; // Thư mục gốc
 
         // Phân loại thư mục lưu trữ dựa trên endpoint gọi API (route sản phẩm là /api/product)
-        if (req.baseUrl.includes('product')) {
+        if (req.baseUrl.includes('product') || req.path.startsWith('/products')) {
             folder += 'products/';
-        } else if (req.baseUrl.includes('banners')) {
+        } else if (req.baseUrl.includes('banners') || req.path.startsWith('/banners')) {
             folder += 'banners/';
         } else if (req.baseUrl.includes('users') || req.baseUrl.includes('auth')) {
             folder += 'avatars/';
@@ -37,7 +37,7 @@ const storage = multer.diskStorage({
 const imageFilter = (req, file, cb) => {
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    if (allowedMimeTypes.includes(file.mimetype) && /\.(jpe?g|png|gif|webp)$/i.test(file.originalname)) {
         cb(null, true);
     } else {
         cb(new Error('Chỉ cho phép tải lên hình ảnh (JPG, PNG, GIF, WEBP)'), false);

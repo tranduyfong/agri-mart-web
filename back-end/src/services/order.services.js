@@ -3,12 +3,14 @@ const mongoose = require('mongoose');
 const { ProductCode } = require('vnpay');
 const User = require('../models/user');
 const Product = require('../models/product');
-const Branch = require('../models/branch');
 const Promotion = require('../models/promotion');
 const Order = require('../models/order');
+const { notifyOrdersChanged } = require('../utils/orderEvents.util');
+const GoodsReceipt = require('../models/goodsReceipt');
+const { getAllocationCost } = require('../utils/report.util');
 const cartService = require('./cart.services');
 const promotionService = require('./promotion.services');
-const { calculateCouponDiscount, getEligibleAmount, allocateDiscount } = require('../utils/promotion.util');
+const { calculateCouponDiscount } = require('../utils/promotion.util');
 const vnpayInstance = require('../configs/vnpay.config');
 const { availableStock } = require('../utils/productStock.util');
 const { normalizeSearch } = require('../utils/string.util');
@@ -65,27 +67,27 @@ const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '') => 
     };
 };
 
-// Một lần mua có thể được chuẩn bị tại nhiều cơ sở, nhưng hiển thị cùng một đơn.
+// Đơn mới có một phiếu duy nhất; lần mua cũ vẫn giữ đủ lịch sử xử lý.
 const buildCheckoutSummary = (orders) => {
     const first = orders[0];
     const activeOrders = orders.filter((order) => order.status !== 'CANCELLED');
+    const paymentOrders = first.payment_method === 'COD' && activeOrders.length ? activeOrders : orders;
     const stages = ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED'];
     const status = activeOrders.length ? stages[Math.min(...activeOrders.map((order) => stages.indexOf(order.status)))] : 'CANCELLED';
     return {
         checkout_code: first.checkout_code || first.code,
         order_codes: orders.map((order) => order.code),
         payment_method: first.payment_method,
-        payment_status: orders.every((order) => order.payment_status === 'PAID')
+        payment_status: paymentOrders.every((order) => order.payment_status === 'PAID')
             ? 'PAID'
-            : orders.every((order) => order.payment_status === 'REFUNDED')
+            : paymentOrders.every((order) => order.payment_status === 'REFUNDED')
               ? 'REFUNDED'
               : 'UNPAID',
         status,
         created_at: first.created_at,
         updated_at: new Date(Math.max(...orders.map((order) => new Date(order.updated_at || order.created_at).getTime()))),
-        branch_orders: orders.map((order) => ({
+        orders: orders.map((order) => ({
             code: order.code,
-            branch_name: order.branch_id?.name || 'AgriFood Smart',
             status: order.status,
             payment_status: order.payment_status,
             updated_at: order.updated_at
@@ -93,17 +95,29 @@ const buildCheckoutSummary = (orders) => {
         paid_at: first.paid_at,
         transaction_code: first.transaction_code,
         payment_expires_at: first.payment_expires_at,
+        confirmed_at: first.confirmed_at,
+        payment_ready_at: first.payment_ready_at,
+        can_pay:
+            first.payment_method === 'VNPAY' &&
+            paymentOrders.every((order) => order.status === 'CONFIRMED') &&
+            paymentOrders.every((order) => order.payment_status === 'UNPAID') &&
+            !!first.payment_expires_at &&
+            first.payment_expires_at > new Date(),
         shipping_address: first.shipping_address,
         note: first.note,
         subtotal: orders.reduce((total, order) => total + order.total_amount, 0),
         discount_amount: orders.reduce((total, order) => total + order.discount_amount, 0),
-        coupon: first.coupon_code ? {
-            code: first.coupon_code,
-            name: first.coupon_name,
-            discount_amount: orders.reduce((total, order) => total + (order.coupon_discount_amount || 0), 0)
-        } : null,
+        coupon: first.coupon_code
+            ? {
+                  code: first.coupon_code,
+                  name: first.coupon_name,
+                  discount_amount: orders.reduce((total, order) => total + (order.coupon_discount_amount || 0), 0)
+              }
+            : null,
         shipping_fee: orders.reduce((total, order) => total + order.shipping_fee, 0),
         total: orders.reduce((total, order) => total + order.final_amount, 0),
+        cancelled_amount: orders.filter((order) => order.status === 'CANCELLED').reduce((total, order) => total + order.final_amount, 0),
+        amount_due: activeOrders.reduce((total, order) => total + order.final_amount, 0),
         items: orders.flatMap((order) =>
             order.items.map((item) => {
                 const product = item.product_id;
@@ -131,7 +145,6 @@ const getCheckout = async (userId, checkoutCode) => {
         user_id: userId,
         $or: [{ checkout_code: checkoutCode }, { code: checkoutCode, checkout_code: null }]
     })
-        .populate('branch_id', 'name')
         .populate('items.product_id', 'name images variants')
         .sort({ code: 1 });
     if (!orders.length) throw new Error('ORDER_NOT_FOUND');
@@ -140,7 +153,6 @@ const getCheckout = async (userId, checkoutCode) => {
 
 const getMyOrders = async (userId, filters, pagination) => {
     const orders = await Order.find({ user_id: userId })
-        .populate('branch_id', 'name')
         .populate('items.product_id', 'name images variants')
         .sort({ created_at: -1, code: 1 });
 
@@ -164,7 +176,6 @@ const getMyOrders = async (userId, filters, pagination) => {
 
 const createCheckout = async (userId, data) => {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
     const checkoutCode = 'DH' + crypto.randomUUID().replace(/-/g, '').toUpperCase();
 
     const resultCode = await mongoose.connection.transaction(async (session) => {
@@ -183,6 +194,11 @@ const createCheckout = async (userId, data) => {
 
         const selectedItems = data.cart_item_ids.map((id) => user.cart_items.id(id));
         if (selectedItems.some((item) => !item)) throw new Error('CART_CHANGED');
+        const costReceipts = await GoodsReceipt.find({
+            created_at: { $lte: now }
+        })
+            .session(session)
+            .lean();
 
         const shippingAddress = {
             recipient_name: data.recipient_name,
@@ -204,15 +220,10 @@ const createCheckout = async (userId, data) => {
             valid_to: { $gte: now }
         }).session(session);
 
-        const groups = [];
+        const items = [];
+        let subtotal = 0;
+        let discountAmount = 0;
         for (const cartItem of selectedItems) {
-            let group = groups.find((entry) => entry.branch_id.equals(cartItem.branch_id));
-            if (!group) {
-                if (!(await Branch.exists({ _id: cartItem.branch_id }).session(session))) throw new Error('CART_CHANGED');
-                group = { branch_id: cartItem.branch_id, items: [], subtotal: 0, discount: 0 };
-                groups.push(group);
-            }
-
             const product = await Product.findOne({ _id: cartItem.product_id, status: 'PUBLISHED' })
                 .populate('category_id', 'name')
                 .session(session);
@@ -225,7 +236,7 @@ const createCheckout = async (userId, data) => {
                 cartItem.quantity <= 0 ||
                 Math.abs(cartItem.quantity * 1000 - units) > 0.00001 ||
                 units % step !== 0 ||
-                cartItem.quantity > availableStock(variant, cartItem.branch_id)
+                cartItem.quantity > availableStock(variant)
             ) {
                 throw new Error('INSUFFICIENT_STOCK');
             }
@@ -240,9 +251,7 @@ const createCheckout = async (userId, data) => {
 
             // Xuất lô còn hạn, ưu tiên lô hết hạn sớm; lưu lại để hoàn đúng lô nếu thanh toán lỗi.
             const today = parseDate(getToday());
-            const stocks = variant.stocks
-                .filter((stock) => stock.branch_id.equals(cartItem.branch_id) && stock.expiry_date >= today)
-                .sort((a, b) => a.expiry_date - b.expiry_date);
+            const stocks = variant.stocks.filter((stock) => stock.expiry_date >= today).sort((a, b) => a.expiry_date - b.expiry_date);
             const allocations = [];
             let remaining = cartItem.quantity;
             for (const stock of stocks) {
@@ -254,6 +263,7 @@ const createCheckout = async (userId, data) => {
                 allocations.push({
                     batch_code: stock.batch_code,
                     quantity: taken,
+                    unit_cost: getAllocationCost(stock, { product_id: product._id, variant_sku: variant.sku }, costReceipts, now),
                     manufactured_date: stock.manufactured_date,
                     expiry_date: stock.expiry_date
                 });
@@ -261,7 +271,7 @@ const createCheckout = async (userId, data) => {
             if (remaining > 0) throw new Error('INSUFFICIENT_STOCK');
             await product.save({ session });
 
-            group.items.push({
+            items.push({
                 product_id: product._id,
                 variant_id: variant._id,
                 variant_sku: variant.sku,
@@ -275,54 +285,55 @@ const createCheckout = async (userId, data) => {
                 price,
                 stock_allocations: allocations
             });
-            group.subtotal += Math.round(variant.list_price * cartItem.quantity);
-            group.discount += Math.round(variant.list_price * cartItem.quantity) - Math.round(price * cartItem.quantity);
+            subtotal += Math.round(variant.list_price * cartItem.quantity);
+            discountAmount += Math.round(variant.list_price * cartItem.quantity) - Math.round(price * cartItem.quantity);
         }
 
         const shippingFee = getShippingFee();
-        const coupon = data.coupon_code ? calculateCouponDiscount(
-            await promotionService.getCoupon(data.coupon_code, session), groups.flatMap((group) => group.items), shippingFee
-        ) : null;
-        const couponAmounts = !coupon ? groups.map(() => 0) : coupon.promotion_scope === 'SHIPPING'
-            ? groups.map((_, index) => index === 0 ? coupon.discount_amount : 0)
-            : allocateDiscount(coupon.discount_amount, groups.map((group) => getEligibleAmount(group.items, coupon.product_ids)));
-        const total = groups.reduce((sum, group) => sum + group.subtotal - group.discount, 0) + shippingFee - (coupon?.discount_amount || 0);
-        if (!Number.isSafeInteger(total) || total < 0 || (total === 0 && data.payment_method === 'VNPAY')) throw new Error('INVALID_AMOUNT');
+        const coupon = data.coupon_code
+            ? calculateCouponDiscount(await promotionService.getCoupon(data.coupon_code, session), items, shippingFee)
+            : null;
+        const couponDiscount = coupon?.discount_amount || 0;
+        const total = subtotal - discountAmount + shippingFee - couponDiscount;
+        if (!Number.isSafeInteger(total) || total < 0 || (total === 0 && data.payment_method === 'VNPAY'))
+            throw new Error('INVALID_AMOUNT');
         if (total !== data.expected_total) throw new Error('PRICE_CHANGED');
 
-        for (let index = 0; index < groups.length; index++) {
-            const group = groups[index];
-            const branchShippingFee = index === 0 ? shippingFee : 0;
-            const order = new Order({
-                code: checkoutCode + '-' + (index + 1),
-                checkout_code: checkoutCode,
-                checkout_key: data.checkout_key,
-                user_id: user._id,
-                branch_id: group.branch_id,
-                total_amount: group.subtotal,
-                discount_amount: group.discount + couponAmounts[index],
-                coupon_code: coupon?.code || null,
-                coupon_name: coupon?.name || null,
-                coupon_discount_amount: couponAmounts[index],
-                shipping_fee: branchShippingFee,
-                final_amount: group.subtotal - group.discount - couponAmounts[index] + branchShippingFee,
-                promotions: coupon && couponAmounts[index] > 0 ? [{ promotion_id: coupon.promotion_id, discount_amount: couponAmounts[index] }] : [],
-                status: data.payment_method === 'COD' ? 'CONFIRMED' : 'PENDING',
-                payment_method: data.payment_method,
-                payment_status: 'UNPAID',
-                payment_expires_at: data.payment_method === 'VNPAY' ? expiresAt : null,
-                shipping_address: shippingAddress,
-                note: data.note || '',
-                items: group.items
-            });
-            await order.save({ session });
-        }
+        await Order.create(
+            [
+                {
+                    code: checkoutCode,
+                    checkout_code: checkoutCode,
+                    checkout_key: data.checkout_key,
+                    user_id: user._id,
+                    total_amount: subtotal,
+                    discount_amount: discountAmount + couponDiscount,
+                    coupon_code: coupon?.code || null,
+                    coupon_name: coupon?.name || null,
+                    coupon_discount_amount: couponDiscount,
+                    shipping_fee: shippingFee,
+                    final_amount: total,
+                    promotions:
+                        coupon && couponDiscount > 0 ? [{ promotion_id: coupon.promotion_id, discount_amount: couponDiscount }] : [],
+                    status: 'PENDING',
+                    status_history: [{ status: 'PENDING', note: 'Khách hàng đặt hàng, chờ nhân viên gọi điện xác nhận' }],
+                    payment_method: data.payment_method,
+                    payment_status: 'UNPAID',
+                    payment_expires_at: null,
+                    shipping_address: shippingAddress,
+                    note: data.note || '',
+                    items
+                }
+            ],
+            { session }
+        );
 
         user.cart_items = user.cart_items.filter((item) => !data.cart_item_ids.includes(item._id.toString()));
         await user.save({ session });
         return checkoutCode;
     });
 
+    if (resultCode === checkoutCode) notifyOrdersChanged();
     return getCheckout(userId, resultCode);
 };
 
@@ -331,6 +342,8 @@ const getPaymentUrl = (checkout, ipAddress) => {
     if (checkout.payment_method !== 'VNPAY' || checkout.payment_status === 'PAID' || checkout.status === 'CANCELLED') {
         throw new Error('PAYMENT_UNAVAILABLE');
     }
+    if (checkout.status === 'PENDING') throw new Error('ORDER_NOT_CONFIRMED');
+    if (!checkout.can_pay || !checkout.payment_ready_at) throw new Error('PAYMENT_UNAVAILABLE');
     if (new Date(checkout.payment_expires_at) <= new Date()) throw new Error('PAYMENT_EXPIRED');
 
     return vnpayInstance.buildPaymentUrl({
@@ -340,14 +353,14 @@ const getPaymentUrl = (checkout, ipAddress) => {
         vnp_OrderInfo: 'Thanh toan don hang ' + checkout.checkout_code,
         vnp_OrderType: ProductCode.Other,
         vnp_ReturnUrl: process.env.VNP_RETURN_URL,
-        vnp_CreateDate: formatVnpayDate(checkout.created_at),
+        vnp_CreateDate: formatVnpayDate(checkout.payment_ready_at),
         vnp_ExpireDate: formatVnpayDate(checkout.payment_expires_at)
     });
 };
 
 // Chỉ gọi sau khi chữ ký đã được xác thực ở controller hoặc QueryDR.
 const updatePayment = async (payment) => {
-    return mongoose.connection.transaction(async (session) => {
+    const changed = await mongoose.connection.transaction(async (session) => {
         const orders = await Order.find({ checkout_code: payment.vnp_TxnRef, payment_method: 'VNPAY' }).session(session);
         if (!orders.length) throw new Error('ORDER_NOT_FOUND');
 
@@ -372,13 +385,25 @@ const updatePayment = async (payment) => {
 
         const user = !success ? await User.findById(orders[0].user_id).session(session) : null;
         for (const order of orders) {
+            // Đơn đã hủy không được mở lại khi callback của lần thanh toán tới.
+            if (order.status === 'CANCELLED') {
+                if (success) {
+                    order.payment_status = 'PAID';
+                    order.paid_at = payment.vnp_PayDate ? parseVnpayDate(payment.vnp_PayDate) : new Date();
+                    order.transaction_code = String(payment.vnp_TransactionNo || '');
+                    order.payment_response_code = String(payment.vnp_ResponseCode);
+                    await order.save({ session });
+                }
+                continue;
+            }
             if (success) {
                 order.payment_status = 'PAID';
-                order.status = 'CONFIRMED';
+                // Callback chỉ cập nhật tiền, không thay thế việc duyệt đơn của nhân viên
+                // và không đưa đơn đang giao/hoàn tất về trạng thái chuẩn bị.
                 order.paid_at = payment.vnp_PayDate ? parseVnpayDate(payment.vnp_PayDate) : new Date();
                 order.transaction_code = String(payment.vnp_TransactionNo || '');
             } else {
-                // Hoàn đúng cơ sở và lô đã xuất. Transaction ngăn callback lặp hoàn kho hai lần.
+                // Hoàn đúng lô đã xuất. Transaction ngăn callback lặp hoàn kho hai lần.
                 for (const item of order.items) {
                     const product = await Product.findById(item.product_id).session(session);
                     const variant = product?.variants.id(item.variant_id);
@@ -387,15 +412,12 @@ const updatePayment = async (payment) => {
                     for (const allocation of item.stock_allocations) {
                         let stock = variant.stocks.find(
                             (lot) =>
-                                lot.branch_id.equals(order.branch_id) &&
-                                lot.batch_code === allocation.batch_code &&
-                                lot.expiry_date.getTime() === allocation.expiry_date.getTime()
+                                lot.batch_code === allocation.batch_code && lot.expiry_date.getTime() === allocation.expiry_date.getTime()
                         );
                         if (stock) {
                             stock.quantity = Math.round((stock.quantity + allocation.quantity) * 1000) / 1000;
                         } else {
                             variant.stocks.push({
-                                branch_id: order.branch_id,
                                 batch_code: allocation.batch_code,
                                 quantity: allocation.quantity,
                                 manufactured_date: allocation.manufactured_date,
@@ -405,22 +427,20 @@ const updatePayment = async (payment) => {
                     }
                     await product.save({ session });
                     if (user) {
-                        const cartItem = user.cart_items.find(
-                            (entry) => entry.variant_id.equals(item.variant_id) && entry.branch_id.equals(order.branch_id)
-                        );
+                        const cartItem = user.cart_items.find((entry) => entry.variant_id.equals(item.variant_id));
                         if (cartItem) {
                             cartItem.quantity = Math.round((cartItem.quantity + item.quantity) * 1000) / 1000;
                         } else {
                             user.cart_items.push({
                                 product_id: item.product_id,
                                 variant_id: item.variant_id,
-                                branch_id: order.branch_id,
                                 quantity: item.quantity
                             });
                         }
                     }
                 }
                 order.status = 'CANCELLED';
+                order.status_history.push({ status: 'CANCELLED', note: 'Giao dịch VNPay không thành công hoặc hết thời gian thanh toán' });
             }
             order.payment_response_code = String(payment.vnp_ResponseCode);
             await order.save({ session });
@@ -428,18 +448,27 @@ const updatePayment = async (payment) => {
         if (user) await user.save({ session });
         return true;
     });
+    if (changed) notifyOrdersChanged();
+    return changed;
 };
 
 const checkPayment = async (userId, checkoutCode) => {
     const checkout = await getCheckout(userId, checkoutCode);
-    if (!vnpayInstance || checkout.payment_method !== 'VNPAY' || checkout.payment_status === 'PAID' || checkout.status === 'CANCELLED')
+    if (
+        !vnpayInstance ||
+        checkout.payment_method !== 'VNPAY' ||
+        checkout.payment_status === 'PAID' ||
+        checkout.status === 'CANCELLED' ||
+        checkout.status === 'PENDING' ||
+        !checkout.payment_ready_at
+    )
         return checkout;
 
     const query = await vnpayInstance.queryDr({
         vnp_RequestId: crypto.randomUUID().replace(/-/g, ''),
         vnp_TxnRef: checkoutCode,
         vnp_OrderInfo: 'Kiem tra don hang ' + checkoutCode,
-        vnp_TransactionDate: formatVnpayDate(checkout.created_at),
+        vnp_TransactionDate: formatVnpayDate(checkout.payment_ready_at),
         vnp_CreateDate: formatVnpayDate(),
         vnp_IpAddr: '127.0.0.1'
     });
@@ -468,8 +497,8 @@ const checkExpiredPayments = async () => {
     const orders = await Order.find({
         payment_method: 'VNPAY',
         payment_status: 'UNPAID',
-        status: 'PENDING',
-        payment_expires_at: { $lt: new Date(Date.now() - 5 * 60 * 1000) }
+        status: 'CONFIRMED',
+        payment_expires_at: { $ne: null, $lt: new Date(Date.now() - 5 * 60 * 1000) }
     })
         .select('user_id checkout_code')
         .limit(20);

@@ -8,12 +8,6 @@ const chatRoomSchema = new Schema({
         required: true
     },
 
-    branch_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Branch',
-        required: true
-    },
-
     assigned_staff_id: {
         type: Schema.Types.ObjectId,
         ref: 'User',

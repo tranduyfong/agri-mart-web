@@ -58,7 +58,7 @@ test('Không giảm lại mã phần trăm đã tự động áp dụng', () => 
     );
 });
 
-test('Phân bổ mã theo cơ sở giữ tổng đúng, không âm và không vượt phần tiền hợp lệ', () => {
+test('Phân bổ mã theo các phần tiền giữ tổng đúng, không âm và không vượt phần tiền hợp lệ', () => {
     assert.deepEqual(allocateDiscount(7, [0, 5, 10]), [0, 2, 5]);
     assert.deepEqual(allocateDiscount(2, [1, 1, 1]), [1, 1, 0]);
     for (let index = 1; index <= 100; index++) {

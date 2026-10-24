@@ -98,17 +98,13 @@ const checkout = async (req, res) => {
             coupon_code: data.coupon_code?.trim()
         });
 
-        let redirectUrl = null;
-        if (
-            order.payment_method === 'VNPAY' &&
-            order.payment_status !== 'PAID' &&
-            order.status !== 'CANCELLED' &&
-            new Date(order.payment_expires_at) > new Date()
-        ) {
-            const ipAddress = req.socket.remoteAddress?.replace('::ffff:', '').replace('::1', '127.0.0.1') || '127.0.0.1';
-            redirectUrl = orderService.getPaymentUrl(order, ipAddress);
-        }
-        return successResponse(res, { checkout_code: order.checkout_code, redirectUrl }, null, 'Đã tạo đơn hàng', 201);
+        return successResponse(
+            res,
+            { checkout_code: order.checkout_code, redirectUrl: null },
+            null,
+            'Đã ghi nhận đơn, chờ nhân viên xác nhận qua điện thoại',
+            201
+        );
     } catch (error) {
         if (COUPON_ERRORS[error.message]) return errorResponse(res, error.message, COUPON_ERRORS[error.message], 400);
         if (error.message === 'ADDRESS_NOT_FOUND') {
@@ -152,6 +148,8 @@ const getPaymentUrl = async (req, res) => {
         return successResponse(res, { redirectUrl: orderService.getPaymentUrl(order, ipAddress) });
     } catch (error) {
         if (error.message === 'ORDER_NOT_FOUND') return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Không tìm thấy đơn hàng', 404);
+        if (error.message === 'ORDER_NOT_CONFIRMED')
+            return errorResponse(res, 'ORDER_NOT_CONFIRMED', 'Vui lòng chờ nhân viên gọi điện xác nhận đơn trước khi thanh toán.', 409);
         if (['PAYMENT_EXPIRED', 'PAYMENT_UNAVAILABLE'].includes(error.message)) {
             return errorResponse(res, 'PAYMENT_UNAVAILABLE', 'Phiên thanh toán đã kết thúc. Vui lòng kiểm tra trạng thái đơn hàng.', 409);
         }

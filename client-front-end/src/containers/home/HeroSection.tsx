@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Carousel, Input, Select } from 'antd';
-import { AppstoreOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Carousel, Input, Modal, Select } from 'antd';
+import contentService, { type PublicBanner } from '../../services/contentService';
+import { getFileUrl } from '../../utils/fileUrl';
+import { AppstoreOutlined, SearchOutlined, CloseOutlined } from '@ant-design/icons';
 import heroImage from '../../assets/images/home-hero.jpg';
 import productsImage from '../../assets/images/why-products.jpg';
 import storeImage from '../../assets/images/why-store.jpg';
@@ -31,6 +33,30 @@ const HeroSection = () => {
   const navigate = useNavigate();
   const { categories } = useCategories();
   const [keyword, setKeyword] = useState('');
+  const [banners, setBanners] = useState<PublicBanner[]>([]);
+  const [popup, setPopup] = useState<PublicBanner | null>(null);
+  useEffect(() => {
+    let active = true;
+    contentService
+      .getBanners()
+      .then((items) => {
+        if (!active) return;
+        setBanners(items.filter((item) => item.type === 'HOME_CAROUSEL'));
+        setPopup(
+          items.find((item) => item.type === 'POPUP' && !sessionStorage.getItem('banner.closed.' + item.id)) || null,
+        );
+      })
+      .catch(() => {
+        /* Giữ banner mặc định khi chưa tải được quảng cáo. */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const closePopup = () => {
+    if (popup) sessionStorage.setItem('banner.closed.' + popup.id, '1');
+    setPopup(null);
+  };
   const [categoryId, setCategoryId] = useState<string>();
   const [autoplay] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -44,6 +70,7 @@ const HeroSection = () => {
 
   return (
     <section className="relative">
+      {!!banners.length && <h1 className="sr-only">{banners[0].title}</h1>}
       <div className="relative overflow-hidden rounded-b-3xl">
         <Carousel
           className="hero-carousel"
@@ -56,23 +83,43 @@ const HeroSection = () => {
           pauseOnHover
           pauseOnFocus
         >
-          {BANNERS.map((banner, index) => (
-            <div key={banner.image}>
-              <div className="relative h-80 sm:h-96">
-                <img src={banner.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-black/20" />
-                <div className="absolute inset-x-0 bottom-24 mx-auto max-w-7xl px-10 text-white sm:px-12">
-                  <p className="mb-3 text-sm font-semibold tracking-widest text-green-200">AGRIFOOD SMART</p>
-                  {index === 0 ? (
-                    <h1 className="max-w-3xl text-2xl font-bold leading-snug sm:text-4xl">{banner.title}</h1>
-                  ) : (
-                    <h2 className="max-w-3xl text-2xl font-bold leading-snug sm:text-4xl">{banner.title}</h2>
-                  )}
-                  <p className="mt-3 max-w-2xl text-base text-white/90">{banner.description}</p>
+          {banners.length
+            ? banners.map((banner) => (
+              <div key={banner.id}>
+                {banner.link_url ? (
+                  <a href={banner.link_url}>
+                    <img
+                      src={getFileUrl(banner.image_url) || undefined}
+                      alt={banner.title}
+                      className="h-80 w-full object-cover sm:h-96"
+                    />
+                  </a>
+                ) : (
+                  <img
+                    src={getFileUrl(banner.image_url) || undefined}
+                    alt={banner.title}
+                    className="h-80 w-full object-cover sm:h-96"
+                  />
+                )}
+              </div>
+            ))
+            : BANNERS.map((banner, index) => (
+              <div key={banner.image}>
+                <div className="relative h-80 sm:h-96">
+                  <img src={banner.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-black/20" />
+                  <div className="absolute inset-x-0 bottom-24 mx-auto max-w-7xl px-10 text-white sm:px-12">
+                    <p className="mb-3 text-sm font-semibold tracking-widest text-green-200">AGRIFOOD SMART</p>
+                    {index === 0 ? (
+                      <h1 className="max-w-3xl text-2xl font-bold leading-snug sm:text-4xl">{banner.title}</h1>
+                    ) : (
+                      <h2 className="max-w-3xl text-2xl font-bold leading-snug sm:text-4xl">{banner.title}</h2>
+                    )}
+                    <p className="mt-3 max-w-2xl text-base text-white/90">{banner.description}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </Carousel>
       </div>
 
@@ -113,6 +160,47 @@ const HeroSection = () => {
           </Button>
         </div>
       </div>
+      <Modal
+        aria-label={popup?.title || 'Quảng cáo'}
+        open={!!popup}
+        onCancel={closePopup}
+        footer={null}
+        closable={false}
+        centered
+        destroyOnHidden
+        styles={{
+          container: { padding: 0, background: 'transparent', boxShadow: 'none', border: 0 },
+          body: { padding: 0 },
+        }}
+      >
+        {popup && (
+          <div className="relative" aria-label={popup.title}>
+            {popup.link_url ? (
+              <a href={popup.link_url}>
+                <img
+                  src={getFileUrl(popup.image_url) || undefined}
+                  alt={popup.title}
+                  className="block max-h-[85vh] w-full object-contain"
+                />
+              </a>
+            ) : (
+              <img
+                src={getFileUrl(popup.image_url) || undefined}
+                alt={popup.title}
+                className="block max-h-[85vh] w-full object-contain"
+              />
+            )}
+            <button
+              type="button"
+              aria-label="Đóng quảng cáo"
+              onClick={closePopup}
+              className="absolute right-2 top-2 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white"
+            >
+              <CloseOutlined />
+            </button>
+          </div>
+        )}
+      </Modal>
     </section>
   );
 };

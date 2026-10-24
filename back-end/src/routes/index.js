@@ -20,5 +20,9 @@ router.use('/wishlist', wishlistRoutes);
 router.use('/account', accountRoutes);
 router.use('/address', addressRoutes);
 router.use('/order', orderRoutes);
+router.use('/staff', require('./staff.routes'));
+router.use('/admin', require('./admin.routes'));
+router.use('/newsletter', require('./newsletter.routes'));
+router.use('/banners', require('./banner.routes'));
 
 module.exports = router;

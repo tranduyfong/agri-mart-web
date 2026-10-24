@@ -2,13 +2,36 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const orderSchema = new Schema({
+    status_history: [{
+        _id: false,
+        status: {
+            type: String,
+            enum: ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED']
+        },
+
+        changed_by: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+
+        changed_at: {
+            type: Date,
+            default: Date.now
+        },
+
+        note: {
+            type: String,
+            default: ''
+        }
+    }],
     code: {
         type: String,
         required: true,
         unique: true
     },
 
-    // Một lần thanh toán có thể gồm các đơn chuẩn bị tại nhiều cơ sở.
+    // Mã của lần đặt hàng, dùng khi kiểm tra thanh toán.
     checkout_code: {
         type: String,
         default: null,
@@ -21,6 +44,16 @@ const orderSchema = new Schema({
     },
 
     payment_expires_at: {
+        type: Date,
+        default: null
+    },
+
+    confirmed_at: {
+        type: Date,
+        default: null
+    },
+
+    payment_ready_at: {
         type: Date,
         default: null
     },
@@ -46,11 +79,6 @@ const orderSchema = new Schema({
         required: true
     },
 
-    branch_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Branch',
-        required: true
-    },
 
     total_amount: Number,
 
@@ -134,6 +162,11 @@ const orderSchema = new Schema({
                 _id: false,
                 batch_code: String,
                 quantity: Number,
+                unit_cost: {
+                    type: Number,
+                    default: null,
+                    min: 0
+                },
                 manufactured_date: Date,
                 expiry_date: Date
             }]
@@ -159,7 +192,7 @@ const orderSchema = new Schema({
 
 orderSchema.index({ 'items.product_id': 1, status: 1, created_at: -1 });
 orderSchema.index({ user_id: 1, created_at: -1 });
-orderSchema.index({ user_id: 1, checkout_key: 1, branch_id: 1 }, {
+orderSchema.index({ user_id: 1, checkout_key: 1 }, {
     unique: true,
     partialFilterExpression: { checkout_key: { $type: 'string' } }
 });

@@ -66,7 +66,8 @@ const OrderResultSection = () => {
   }, [code, requestKey, sessionToken, navigate, dispatch, location.pathname]);
 
   const isPending =
-    order?.payment_method === 'VNPAY' && order.payment_status === 'UNPAID' && order.status === 'PENDING';
+    order?.payment_method === 'VNPAY' && order.payment_status === 'UNPAID' && order.status === 'CONFIRMED';
+  const awaitingConfirmation = order?.status === 'PENDING';
   const isInProgress = !!order && !['COMPLETED', 'CANCELLED'].includes(order.status);
   useEffect(() => {
     if (!isInProgress) return;
@@ -81,13 +82,13 @@ const OrderResultSection = () => {
           })
           .catch(() => undefined);
       },
-      isPending ? 5000 : 30000,
+      isPending || awaitingConfirmation ? 5000 : 30000,
     );
     return () => {
       outdated = true;
       window.clearInterval(timer);
     };
-  }, [code, isPending, isInProgress, requestKey, sessionToken]);
+  }, [code, isPending, awaitingConfirmation, isInProgress, requestKey, sessionToken]);
 
   const checkPayment = async () => {
     setIsBusy(true);
@@ -119,22 +120,26 @@ const OrderResultSection = () => {
   const reviewRequired = order?.status === 'CANCELLED' && order.payment_status === 'PAID';
   const cancelled = order?.status === 'CANCELLED';
   const isCod = order?.payment_method === 'COD';
+  const hasCancelledOrder = !!order?.orders.some((entry) => entry.status === 'CANCELLED');
+  const totalToShow = isCod && hasCancelledOrder ? order?.amount_due : order?.total;
   const expired = !!order?.payment_expires_at && new Date(order.payment_expires_at) <= new Date();
   const heading = reviewRequired
     ? 'Đơn hàng cần được kiểm tra'
     : cancelled
       ? 'Đơn hàng đã hủy'
-      : isPending
-        ? 'Đang chờ thanh toán'
-        : order?.status === 'COMPLETED'
-          ? 'Giao hàng thành công!'
-          : order?.status === 'SHIPPING'
-            ? 'Đơn hàng đang được giao'
-            : order?.status === 'CONFIRMED'
-              ? 'Đơn hàng đang được chuẩn bị'
-              : isCod
-                ? 'Đặt hàng thành công!'
-                : 'Thanh toán thành công!';
+      : awaitingConfirmation
+        ? 'Chờ nhân viên xác nhận đơn hàng'
+        : isPending
+          ? 'Đơn đã xác nhận, mời bạn thanh toán'
+          : order?.status === 'COMPLETED'
+            ? 'Giao hàng thành công!'
+            : order?.status === 'SHIPPING'
+              ? 'Đơn hàng đang được giao'
+              : order?.status === 'CONFIRMED'
+                ? 'Đơn hàng đang được chuẩn bị'
+                : isCod
+                  ? 'Đặt hàng thành công!'
+                  : 'Thanh toán thành công!';
 
   return (
     <div className="flex flex-1 items-start justify-center bg-page-gray px-4 py-12 sm:py-20 lg:py-24">
@@ -174,13 +179,13 @@ const OrderResultSection = () => {
         <section className="w-full max-w-2xl rounded-2xl border border-white bg-[#f8fcfa] p-5 shadow-sm sm:p-8">
           <div className="text-center">
             <span
-              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl ${reviewRequired || isPending ? 'bg-amber-50 text-amber-500' : cancelled ? 'bg-red-50 text-red-500' : 'bg-primary/10 text-primary'}`}
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl ${reviewRequired || isPending || awaitingConfirmation ? 'bg-amber-50 text-amber-500' : cancelled ? 'bg-red-50 text-red-500' : 'bg-primary/10 text-primary'}`}
             >
               {reviewRequired ? (
                 <ExclamationCircleFilled />
               ) : cancelled ? (
                 <CloseCircleFilled />
-              ) : isPending ? (
+              ) : isPending || awaitingConfirmation ? (
                 <ClockCircleOutlined />
               ) : (
                 <CheckCircleFilled />
@@ -188,34 +193,49 @@ const OrderResultSection = () => {
             </span>
             <h1 className="mt-5 text-xl font-bold text-gray-900 sm:text-2xl">{heading}</h1>
             <p data-order-total className="mt-3 text-3xl font-bold text-gray-900">
-              {formatPrice(order.total)}
+              {formatPrice(totalToShow ?? order.total)}
             </p>
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-500">
               {reviewRequired
-                ? 'Hệ thống đã ghi nhận thanh toán sau khi đơn kết thúc. Vui lòng liên hệ cửa hàng để kiểm tra và hỗ trợ hoàn tiền.'
+                ? 'Đơn đã hủy nhưng hệ thống có ghi nhận thanh toán. Vui lòng liên hệ cửa hàng để kiểm tra và hỗ trợ hoàn tiền.'
                 : cancelled
                   ? 'Đơn hàng đã kết thúc. Bạn có thể quay lại cửa hàng để chọn mua sản phẩm.'
-                  : isPending
-                    ? 'Hoàn tất thanh toán trên VNPay hoặc kiểm tra lại nếu bạn đã thanh toán.'
-                    : order.status === 'COMPLETED'
-                      ? 'Cảm ơn bạn đã mua sắm tại AgriFood Smart. Chúc bạn có những bữa ăn ngon!'
-                      : order.status === 'SHIPPING'
-                        ? 'Đơn hàng đang trên đường đến bạn. Vui lòng giữ liên lạc để nhận hàng.'
-                        : isCod
-                          ? 'Cảm ơn bạn đã đặt hàng. Vui lòng thanh toán khi nhận hàng.'
-                          : 'Cảm ơn bạn! Giao dịch đã được xác nhận và đơn hàng đang được xử lý.'}
+                  : awaitingConfirmation
+                    ? 'Cửa hàng sẽ gọi điện xác nhận thông tin mua hàng. Nếu chọn VNPay, bạn chỉ thanh toán sau khi nhân viên duyệt đơn. Trang này sẽ tự cập nhật.'
+                    : isPending
+                      ? 'Nhân viên đã xác nhận đơn. Bạn có 15 phút từ lúc duyệt để thanh toán qua VNPay.'
+                      : order.status === 'COMPLETED'
+                        ? 'Cảm ơn bạn đã mua sắm tại AgriFood Smart. Chúc bạn có những bữa ăn ngon!'
+                        : order.status === 'SHIPPING'
+                          ? 'Đơn hàng đang trên đường đến bạn. Vui lòng giữ liên lạc để nhận hàng.'
+                          : isCod
+                            ? 'Cảm ơn bạn đã đặt hàng. Vui lòng thanh toán khi nhận hàng.'
+                            : 'Cảm ơn bạn! Giao dịch đã được xác nhận và đơn hàng đang được xử lý.'}
             </p>
           </div>
 
           <div className="mt-7 rounded-xl bg-white px-2 py-5 sm:px-4">
+            {hasCancelledOrder && !cancelled && (
+              <Alert
+                className="mb-5"
+                type="warning"
+                showIcon
+                title="Một phần đơn hàng đã hủy"
+                description={
+                  isCod
+                    ? 'Bạn chỉ thanh toán tiền các kiện hàng còn lại. Giá trị các kiện đã hủy được trừ ở phần tổng tiền bên dưới.'
+                    : 'Vui lòng liên hệ cửa hàng để đối soát khoản thanh toán và phần tiền cần hoàn cho các kiện đã hủy.'
+                }
+              />
+            )}
             <DeliveryProgress status={order.status} />
-            {order.branch_orders.length > 1 && (
+            {order.orders.length > 1 && (
               <div className="mt-5 space-y-3 border-t border-gray-100 pt-4 text-sm">
                 <p className="font-semibold">Tiến độ từng kiện hàng</p>
-                {order.branch_orders.map((branch) => (
-                  <div key={branch.code} className="flex flex-wrap justify-between gap-2">
-                    <span>{branch.branch_name}</span>
-                    <Tag color={ORDER_STATUSES[branch.status].color}>{ORDER_STATUSES[branch.status].label}</Tag>
+                {order.orders.map((entry) => (
+                  <div key={entry.code} className="flex flex-wrap justify-between gap-2">
+                    <span>{entry.code}</span>
+                    <Tag color={ORDER_STATUSES[entry.status].color}>{ORDER_STATUSES[entry.status].label}</Tag>
                   </div>
                 ))}
               </div>
@@ -282,17 +302,30 @@ const OrderResultSection = () => {
             {order.discount_amount - (order.coupon?.discount_amount || 0) > 0 && (
               <div className="flex justify-between gap-3">
                 <dt className="text-gray-500">Ưu đãi sản phẩm</dt>
-                <dd className="text-primary">−{formatPrice(order.discount_amount - (order.coupon?.discount_amount || 0))}</dd>
+                <dd className="text-primary">
+                  −{formatPrice(order.discount_amount - (order.coupon?.discount_amount || 0))}
+                </dd>
               </div>
             )}
             <div className="flex justify-between gap-3">
               <dt className="text-gray-500">Phí giao hàng</dt>
               <dd>{formatPrice(order.shipping_fee)}</dd>
             </div>
-            {order.coupon && <div className="flex justify-between gap-3"><dt className="min-w-0 break-all text-gray-500">Mã {order.coupon.code}</dt><dd className="shrink-0 text-primary">−{formatPrice(order.coupon.discount_amount)}</dd></div>}
+            {order.coupon && (
+              <div className="flex justify-between gap-3">
+                <dt className="min-w-0 break-all text-gray-500">Mã {order.coupon.code}</dt>
+                <dd className="shrink-0 text-primary">−{formatPrice(order.coupon.discount_amount)}</dd>
+              </div>
+            )}
+            {isCod && hasCancelledOrder && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Các kiện hàng đã hủy</dt>
+                <dd className="text-primary">−{formatPrice(order.cancelled_amount)}</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-3 border-t border-dashed border-gray-200 pt-5 font-bold text-gray-900">
               <dt>Tổng cộng</dt>
-              <dd>{formatPrice(order.total)}</dd>
+              <dd>{formatPrice(totalToShow ?? order.total)}</dd>
             </div>
           </dl>
           {order.note && (
@@ -326,13 +359,22 @@ const OrderResultSection = () => {
                   type="primary"
                   size="large"
                   icon={<CreditCardOutlined />}
-                  disabled={isBusy || expired}
+                  disabled={isBusy || expired || !order.can_pay}
                   onClick={resumePayment}
                 >
                   Tiếp tục với VNPay
                 </Button>
               </div>
             </>
+          )}
+          {awaitingConfirmation && (
+            <Alert
+              className="mb-4"
+              type="info"
+              showIcon
+              title="Đơn hàng đã được ghi nhận"
+              description="Vui lòng giữ liên lạc để nhân viên gọi điện xác nhận. Bạn có thể quay lại mục Kiểm tra đơn hàng để xem kết quả."
+            />
           )}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Link to={cancelled && !reviewRequired ? ROUTES.CART : ROUTES.SHOP}>

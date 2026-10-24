@@ -13,6 +13,11 @@ const promotionSchema = new Schema({
         required: true
     },
 
+    image_url: {
+        type: String,
+        default: null
+    },
+
     discount_value: {
         type: Number,
         required: true,

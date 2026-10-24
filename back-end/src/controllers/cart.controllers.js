@@ -26,7 +26,7 @@ const addCartItem = async (req, res) => {
             return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Sản phẩm không tồn tại hoặc đã ngừng bán', 404);
         }
         if (error.message === 'INSUFFICIENT_STOCK') {
-            return errorResponse(res, 'INSUFFICIENT_STOCK', 'Số lượng vượt quá tồn kho còn hạn tại chi nhánh', 409);
+            return errorResponse(res, 'INSUFFICIENT_STOCK', 'Số lượng vượt quá tồn kho còn hạn', 409);
         }
         if (error.message === 'INVALID_QUANTITY') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Số lượng phải đúng bước bán và có tối đa 3 chữ số thập phân', 400);
@@ -53,7 +53,7 @@ const updateCartItem = async (req, res) => {
             return errorResponse(res, 'RESOURCE_NOT_FOUND', 'Sản phẩm không còn khả dụng trong giỏ hàng', 404);
         }
         if (error.message === 'INSUFFICIENT_STOCK') {
-            return errorResponse(res, 'INSUFFICIENT_STOCK', 'Số lượng vượt quá tồn kho còn hạn tại chi nhánh', 409);
+            return errorResponse(res, 'INSUFFICIENT_STOCK', 'Số lượng vượt quá tồn kho còn hạn', 409);
         }
         if (error.message === 'INVALID_QUANTITY') {
             return errorResponse(res, 'VALIDATION_FAILED', 'Số lượng phải đúng bước bán và có tối đa 3 chữ số thập phân', 400);
