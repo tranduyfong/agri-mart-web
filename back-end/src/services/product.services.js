@@ -13,6 +13,8 @@ const { availableStock } = require('../utils/productStock.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
 const { getAllocationCost } = require('../utils/report.util');
 
+const runTransaction = (session, work) => (session ? work(session) : mongoose.connection.transaction(work));
+
 const createSlug = (name, code) => {
     return slugify(name + ' ' + code, { lower: true, strict: true, locale: 'vi' });
 };
@@ -240,14 +242,14 @@ const addImages = (product, data) => {
     product.images = [...new Set([...product.images, ...uploads, ...urls])];
 };
 
-const createProduct = async (data) => {
+const createProduct = async (data, session = null, validateOnly = false) => {
     if (!mongoose.isObjectIdOrHexString(data.category_id) || !(await Category.exists({ _id: data.category_id }))) {
         throw new Error('CATEGORY_NOT_FOUND');
     }
     if (data.variants !== undefined && !Array.isArray(data.variants)) throw new Error('INVALID_PRODUCT_DATA');
 
     // Lưu sản phẩm, tồn ban đầu và phiếu nhập trong cùng một transaction.
-    return mongoose.connection.transaction(async (session) => {
+    return runTransaction(session, async (session) => {
         const product = new Product({
             category_id: data.category_id,
             code: data.code,
@@ -309,6 +311,8 @@ const createProduct = async (data) => {
             });
             receipt.total_amount += stock.quantity * stock.unit_cost;
         }
+        await product.validate();
+        if (validateOnly) return product.toObject();
         await product.save({ session });
         if (receipt.items.length) {
             receipt.total_amount = Math.round(receipt.total_amount);
@@ -319,9 +323,9 @@ const createProduct = async (data) => {
     });
 };
 
-const updateProduct = async (data) => {
+const updateProduct = async (data, session = null, validateOnly = false) => {
     if (!mongoose.isObjectIdOrHexString(data.id)) throw new Error('PRODUCT_NOT_FOUND');
-    const product = await Product.findById(data.id);
+    const product = await Product.findById(data.id).session(session);
     if (!product) throw new Error('PRODUCT_NOT_FOUND');
 
     if (
@@ -354,16 +358,22 @@ const updateProduct = async (data) => {
     product.images = product.images.filter((url) => !removedImages.includes(url));
     addImages(product, data);
     checkVariants(product);
-    await product.save();
+    await product.validate();
+    if (validateOnly) return product.toObject();
+    await product.save({ session });
 
     // Chỉ xóa ảnh nội bộ sau khi cập nhật thành công và ảnh không còn được dùng.
-    for (const url of removedImages) {
-        if (/^uploads\/(?!.*\.\.)/.test(url) && !(await Product.exists({ images: url }))) {
+    for (const url of session ? [] : removedImages) {
+        if (
+            /^uploads\/(?!.*\.\.)/.test(url) &&
+            !(await Product.exists({ images: url })) &&
+            !(await require('../models/productChange').exists({ $or: [{ 'before.images': url }, { 'after.images': url }] }))
+        ) {
             deleteUploadedFiles([{ path: url }]);
         }
     }
 
-    return getProductDetail({ id: data.id });
+    return session ? { productId: product.id, slug: product.slug } : getProductDetail({ id: data.id });
 };
 
 const validateImportRows = async (items, session) => {
@@ -419,7 +429,7 @@ const validateImportRows = async (items, session) => {
     }
 };
 
-const importGoods = async (data) => {
+const importGoods = async (data, session = null) => {
     const { items, supplier_id, note, user_id } = data;
     if (supplier_id && (!mongoose.isObjectIdOrHexString(supplier_id) || !(await Supplier.exists({ _id: supplier_id }))))
         throw new Error('SUPPLIER_NOT_FOUND');
@@ -427,7 +437,7 @@ const importGoods = async (data) => {
     if (items.length > 1000) throw new Error('INVALID_PRODUCT_DATA');
 
     // Phiếu nhập và các lô hàng phải được lưu cùng nhau: có lỗi thì hủy toàn bộ.
-    return mongoose.connection.transaction(async (session) => {
+    return runTransaction(session, async (session) => {
         if (data.import_key) {
             const existing = await GoodsReceipt.findOne({ created_by: user_id, import_key: data.import_key }).session(session);
             if (existing)

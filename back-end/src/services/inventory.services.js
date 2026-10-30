@@ -184,6 +184,17 @@ const confirmImport = async (userId, data) => {
         data.source_file.length > 200
     )
         throw new Error('INVALID_DATA');
+    const user = await require('../models/user').findById(userId);
+    if (user?.role !== 'ADMIN') {
+        return require('./productChange.services').submitImport(userId, {
+            items: data.rows,
+            supplier_id: data.supplier_id || null,
+            note: String(data.note || '').slice(0, 1000),
+            user_id: userId,
+            import_key: data.import_key,
+            source_file: data.source_file
+        });
+    }
     const existing = await GoodsReceipt.findOne({ created_by: userId, import_key: data.import_key });
     if (existing) return getReceipt(existing._id.toString());
     const preview = await previewImport(data.rows);

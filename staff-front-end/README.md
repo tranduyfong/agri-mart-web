@@ -30,7 +30,7 @@ src/
   app/          router, cấu hình giao diện Ant Design
   components/   Panel, PageHeader, bảng đơn, trạng thái, trình soạn nội dung...
   containers/   phần giao diện/nghiệp vụ của từng màn hình
-  context/      đăng nhập, quyền và mã kho nội bộ
+  context/      đăng nhập, quyền và thông báo đơn hàng
   hooks/        useAuth, useData
   pages/        các trang ghép container
   services/     gọi API theo từng chức năng
@@ -45,9 +45,10 @@ Các màn hình S01–S18 được ghép theo luồng: nhập file/kiểm tra/th
 - Công việc hôm nay: số liệu thật theo quyền, các đơn gần nhất.
 - Đơn chờ duyệt: huy hiệu đỏ ở menu và góc phải header, bấm để mở danh sách chờ xác nhận. Socket.IO cập nhật danh sách/chi tiết khi khách đặt hoặc nhân viên xử lý đơn; tự kết nối lại và kiểm tra số lượng mỗi 5 giây. Tài khoản cần quyền `ORDER_MANAGE`. Hủy đơn hoàn đúng lô hàng đã xuất.
 - Duyệt đơn: nhân viên có quyền Đơn hàng bấm **Duyệt đơn** ngay trong bảng danh sách/công việc hôm nay hoặc đầu trang chi tiết. Gọi điện xác nhận với khách rồi xác nhận duyệt; đơn chuyển sang chuẩn bị, khách mới được tiếp tục thanh toán VNPay.
-- Sản phẩm: tìm tên/mã/SKU, lọc, phân trang; thêm/sửa nhiều quy cách, giá, ảnh tải lên hoặc URL; cần ảnh và quy cách trước khi đăng bán.
+- Sản phẩm: tìm tên/mã/SKU, lọc, phân trang; thêm/sửa nhiều quy cách, giá, ảnh tải lên hoặc URL; cần ảnh và quy cách trước khi đăng bán. STAFF bấm **Gửi duyệt sản phẩm**, dữ liệu đang bán chỉ đổi sau khi ADMIN duyệt.
+- Yêu cầu sản phẩm (`/product-changes`): xem các yêu cầu thêm/sửa/nhập của chính mình, nội dung trước/sau, trạng thái và lý do từ chối. Tự tải lại mỗi 10 giây.
 - Danh mục: tên, đường dẫn, ảnh tải từ máy/URL, số sản phẩm đang bán.
-- Nhập hàng: tải mẫu CSV, đọc `.xlsx`/`.csv`, xem lỗi từng dòng, xác nhận ghi phiếu nhập và cập nhật đúng lô. Gửi lại cùng khóa nhập không cộng kho lần nữa. Sản phẩm mới được tạo nháp.
+- Nhập hàng: tải mẫu CSV, đọc `.xlsx`/`.csv`, xem lỗi từng dòng, gửi toàn bộ phiếu chờ ADMIN duyệt. Khi duyệt mới ghi phiếu, cập nhật đúng lô và tạo sản phẩm mới ở bản nháp. Gửi lại cùng khóa không tạo yêu cầu hay cộng kho lần nữa. ADMIN thao tác trực tiếp vẫn nhập ngay.
 - Tồn kho: tồn thực, lượng phân bổ cho đơn chờ/đang chuẩn bị, lượng còn có thể bán và hạn dùng; hàng hết hạn khóa bán. Đơn đã bàn giao vận chuyển không còn tính vào tồn thực tại cửa hàng.
 - Đơn hàng: tìm/lọc, chi tiết người nhận, sản phẩm, ưu đãi, lịch sử xử lý. Chuẩn bị → đang giao → hoàn tất; COD chỉ ghi đã thanh toán khi xác nhận giao và thu đủ tiền. Hủy hoàn đúng lô, không hoàn lặp. Đơn online chưa trả tiền không được giao; đơn đã trả tiền bị hủy cần cửa hàng đối soát/hoàn tiền riêng.
 - Khuyến mãi: thời gian, giảm phần trăm tự động hoặc mã giảm tiền; dán mã sản phẩm/SKU, bỏ mã trùng, báo mã không tồn tại, xem giá minh họa.
@@ -74,7 +75,7 @@ Giữ model hiện có: tồn nằm trong Product.variants.stocks, giá nhập n
 
 COD/VNPay đều chờ nhân viên gọi điện xác nhận. Xác nhận trước, VNPay mới mở cho khách trong 15 phút; đơn chưa trả tiền không được giao. Callback không thay thế bước duyệt của nhân viên. Chi tiết tại [luồng mới](../back-end/SINGLE-STORE.md).
 
-Backend chỉ thêm hai model cho bản tin: `Subscriber` (đăng ký/hủy đăng ký) và `Newsletter` (nội dung/lịch sử gửi). Phiếu nhập thêm khóa chống trùng/file nguồn; đơn hàng thêm lịch sử trạng thái.
+Backend dùng `Subscriber` (đăng ký/hủy đăng ký), `Newsletter` (nội dung/lịch sử gửi) và một model `ProductChange` cho yêu cầu thêm/sửa/nhập sản phẩm. Phiếu nhập có khóa chống trùng/file nguồn; đơn hàng có lịch sử trạng thái.
 
 ## Kiểm tra
 

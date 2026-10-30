@@ -1,7 +1,14 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { App, Button, Input } from 'antd';
-import { CheckCircleFilled, HeartFilled, HeartOutlined, InfoCircleOutlined, ShareAltOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import {
+  CheckCircleFilled,
+  HeartFilled,
+  HeartOutlined,
+  InfoCircleOutlined,
+  ShareAltOutlined,
+  ShoppingCartOutlined,
+} from '@ant-design/icons';
 import useShoppingActions from '../../hooks/useShoppingActions';
 import { useAppSelector } from '../../hooks/useRedux';
 import { getFileUrl } from '../../utils/fileUrl';
@@ -23,7 +30,6 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
   const { runMutation, isBusy } = useShoppingActions();
   const isFavorite = useAppSelector((state) => state.shopping.wishlist.some((item) => item.id === product.id));
   const navigate = useNavigate();
-  const purchaseRef = useRef<HTMLDivElement>(null);
   const initialVariant = product.variants.find((variant) => getMaxQuantity(variant) > 0) || product.variants[0];
   const [selectedVariantId, setSelectedVariantId] = useState(initialVariant?.id);
   const [quantity, setQuantity] = useState(initialVariant ? normalizeQuantity(1, initialVariant) : 0);
@@ -42,13 +48,18 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
     setQuantity(normalizeQuantity(1, variant));
   };
 
-  const addToCart = async (source: HTMLElement | null, goToCart = false) => {
+  const addToCart = async (source: HTMLElement | null) => {
     if (!selectedVariant || quantity <= 0 || isBusy) return;
-    const added = await runMutation(
+    await runMutation(
       { kind: 'addCart', variantId: selectedVariant.id, quantity },
-      source, getFileUrl(product.images[0]?.url ?? null),
+      source,
+      getFileUrl(product.images[0]?.url ?? null),
     );
-    if (added && goToCart) navigate(ROUTES.CART);
+  };
+
+  const buyNow = () => {
+    if (!selectedVariant || quantity <= 0 || isBusy) return;
+    navigate(`${ROUTES.CHECKOUT}?variant=${encodeURIComponent(selectedVariant.id)}&quantity=${quantity}`);
   };
 
   const shareProduct = async () => {
@@ -60,26 +71,46 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
         await navigator.clipboard.writeText(url);
         message.success('Đã sao chép liên kết sản phẩm');
       } else {
-        modal.info({ title: 'Chia sẻ sản phẩm', content: <Input aria-label="Liên kết sản phẩm" readOnly value={url} onFocus={(event) => event.target.select()} /> });
+        modal.info({
+          title: 'Chia sẻ sản phẩm',
+          content: (
+            <Input aria-label="Liên kết sản phẩm" readOnly value={url} onFocus={(event) => event.target.select()} />
+          ),
+        });
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      modal.info({ title: 'Chia sẻ sản phẩm', content: <Input aria-label="Liên kết sản phẩm" readOnly value={url} onFocus={(event) => event.target.select()} /> });
+      modal.info({
+        title: 'Chia sẻ sản phẩm',
+        content: (
+          <Input aria-label="Liên kết sản phẩm" readOnly value={url} onFocus={(event) => event.target.select()} />
+        ),
+      });
     }
   };
 
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-3">
-        <Link to={`${ROUTES.SHOP}?category_id=${product.category_id}`} className="text-sm font-medium text-gray-500 hover:text-primary">
+        <Link
+          to={`${ROUTES.SHOP}?category_id=${product.category_id}`}
+          className="text-sm font-medium text-gray-500 hover:text-primary"
+        >
           {product.category_name}
         </Link>
         <div className="flex items-center gap-1">
           <IconButton icon={<ShareAltOutlined />} label="Chia sẻ sản phẩm" onClick={shareProduct} />
           <IconButton
             icon={isFavorite ? <HeartFilled className="text-red-500" /> : <HeartOutlined />}
-            label={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'} pressed={isFavorite} disabled={isBusy}
-            onClick={(event) => runMutation({ kind: isFavorite ? 'removeWishlist' : 'addWishlist', productId: product.id }, event.currentTarget)}
+            label={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+            pressed={isFavorite}
+            disabled={isBusy}
+            onClick={(event) =>
+              runMutation(
+                { kind: isFavorite ? 'removeWishlist' : 'addWishlist', productId: product.id },
+                event.currentTarget,
+              )
+            }
           />
         </div>
       </div>
@@ -90,9 +121,13 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
           <>
             <span className="text-3xl font-bold text-primary">{formatPrice(salePrice)}</span>
             <span className="text-sm text-gray-500">/ {selectedVariant.unit}</span>
-            {!!product.discount_percent && <span className="text-sm text-gray-400 line-through">{formatPrice(originalPrice)}</span>}
+            {!!product.discount_percent && (
+              <span className="text-sm text-gray-400 line-through">{formatPrice(originalPrice)}</span>
+            )}
           </>
-        ) : <span className="text-sm text-gray-500">Chưa có giá bán</span>}
+        ) : (
+          <span className="text-sm text-gray-500">Chưa có giá bán</span>
+        )}
       </div>
 
       <div className="mt-5 text-sm leading-6 text-gray-500">
@@ -100,7 +135,12 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
           {description || 'Thông tin mô tả sản phẩm đang được cập nhật.'}
         </p>
         {description && description.length > 220 && (
-          <button type="button" aria-expanded={isDescriptionExpanded} onClick={() => setIsDescriptionExpanded((value) => !value)} className="mt-1 cursor-pointer font-semibold text-primary hover:underline">
+          <button
+            type="button"
+            aria-expanded={isDescriptionExpanded}
+            onClick={() => setIsDescriptionExpanded((value) => !value)}
+            className="mt-1 cursor-pointer font-semibold text-primary hover:underline"
+          >
             {isDescriptionExpanded ? 'Thu gọn' : 'Đọc thêm'}
           </button>
         )}
@@ -125,45 +165,82 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
                 </button>
               ))}
             </div>
-          ) : <p className="text-sm text-gray-500">Sản phẩm chưa có quy cách bán.</p>}
+          ) : (
+            <p className="text-sm text-gray-500">Sản phẩm chưa có quy cách bán.</p>
+          )}
         </fieldset>
 
         {selectedVariant && (
           <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
             <div>
               <p className="mb-2 text-sm font-semibold text-gray-900">Số lượng</p>
-              <QuantitySelector value={quantity} step={getQuantityStep(selectedVariant)} max={maxQuantity} unit={selectedVariant.unit} disabled={isBusy} onChange={(value) => setQuantity(normalizeQuantity(value, selectedVariant))} />
+              <QuantitySelector
+                value={quantity}
+                step={getQuantityStep(selectedVariant)}
+                max={maxQuantity}
+                unit={selectedVariant.unit}
+                disabled={isBusy}
+                onChange={(value) => setQuantity(normalizeQuantity(value, selectedVariant))}
+              />
             </div>
-            <span role="status" className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isOutOfStock ? 'bg-gray-200 text-gray-500' : 'bg-primary/10 text-primary'}`}>
+            <span
+              role="status"
+              className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isOutOfStock ? 'bg-gray-200 text-gray-500' : 'bg-primary/10 text-primary'}`}
+            >
               <CheckCircleFilled />
-              {isOutOfStock ? 'Hết hàng' : `Còn ${selectedVariant.stock_quantity.toLocaleString('vi-VN')} ${selectedVariant.unit}`}
+              {isOutOfStock
+                ? 'Hết hàng'
+                : `Còn ${selectedVariant.stock_quantity.toLocaleString('vi-VN')} ${selectedVariant.unit}`}
             </span>
           </div>
         )}
 
         <div className="mt-6 flex items-center justify-between gap-3 text-sm">
           <span className="text-gray-500">Tạm tính</span>
-          <span aria-live="polite" className="text-xl font-bold text-gray-900">{formatPrice(totalPrice)}</span>
+          <span aria-live="polite" className="text-xl font-bold text-gray-900">
+            {formatPrice(totalPrice)}
+          </span>
         </div>
-        <div ref={purchaseRef} className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Button size="large" block disabled={isOutOfStock || isBusy} icon={<ShoppingCartOutlined />} onClick={(event) => addToCart(event.currentTarget)} className="h-12 border-primary/10 bg-primary/15 font-semibold text-primary-dark hover:bg-primary/25">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Button
+            size="large"
+            block
+            disabled={isOutOfStock || isBusy}
+            icon={<ShoppingCartOutlined />}
+            onClick={(event) => addToCart(event.currentTarget)}
+            className="h-12 border-primary/10 bg-primary/15 font-semibold text-primary-dark hover:bg-primary/25"
+          >
             Thêm vào giỏ
           </Button>
           <div className="[&_button]:h-12">
-            <PrimaryButton disabled={isOutOfStock || isBusy} onClick={() => addToCart(purchaseRef.current?.querySelector('button') ?? null, true)}>{isOutOfStock ? 'Tạm hết hàng' : 'Mua ngay'}</PrimaryButton>
+            <PrimaryButton disabled={isOutOfStock || isBusy} onClick={buyNow}>
+              {isOutOfStock ? 'Tạm hết hàng' : 'Mua ngay'}
+            </PrimaryButton>
           </div>
         </div>
         <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
-          <div className="flex gap-1"><dt>Mã sản phẩm:</dt><dd className="font-medium text-gray-700">{product.code}</dd></div>
-          {selectedVariant && <div className="flex gap-1"><dt>SKU:</dt><dd className="break-all font-medium text-gray-700">{selectedVariant.sku}</dd></div>}
+          <div className="flex gap-1">
+            <dt>Mã sản phẩm:</dt>
+            <dd className="font-medium text-gray-700">{product.code}</dd>
+          </div>
+          {selectedVariant && (
+            <div className="flex gap-1">
+              <dt>SKU:</dt>
+              <dd className="break-all font-medium text-gray-700">{selectedVariant.sku}</dd>
+            </div>
+          )}
         </dl>
       </div>
 
       <div className="mt-6 flex gap-3 rounded-xl border border-white bg-white/70 p-4">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><InfoCircleOutlined /></span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <InfoCircleOutlined />
+        </span>
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Lưu ý khi đặt hàng</h2>
-          <p className="mt-1 text-xs leading-5 text-gray-500">Giá và số lượng còn hàng được cập nhật theo từng quy cách. Vui lòng chọn quy cách phù hợp trước khi đặt mua.</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            Giá và số lượng còn hàng được cập nhật theo từng quy cách. Vui lòng chọn quy cách phù hợp trước khi đặt mua.
+          </p>
         </div>
       </div>
     </div>

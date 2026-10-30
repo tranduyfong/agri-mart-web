@@ -8,6 +8,7 @@ import AccountPage from '../pages/AccountPage';
 import PermissionsPage from '../pages/PermissionsPage';
 import RevenueReportPage from '../pages/RevenueReportPage';
 import InventoryReportPage from '../pages/InventoryReportPage';
+import ProductChangesPage from '../pages/ProductChangesPage';
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
@@ -19,6 +20,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <OverviewPage /> },
+      { path: 'product-changes', element: <ProductChangesPage /> },
       { path: 'accounts', element: <AccountPage /> },
       { path: 'permissions', element: <PermissionsPage /> },
       { path: 'reports/revenue', element: <RevenueReportPage /> },

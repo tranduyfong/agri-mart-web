@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="vi"><meta charset="utf-8">
+<style>
+body{font:14px/1.6 system-ui,sans-serif;background:#f6f8f4;color:#253124;padding:18px;margin:0}h1{font-size:20px;margin:0 0 12px}
+p{margin:10px 0}.panel{background:white;border:1px solid #dfe7da;border-radius:10px;padding:12px}.note{font-size:12px;color:#65715f}
+button{display:block;width:100%;padding:12px;border:0;border-radius:9px;background:#287a32;color:white;font-weight:600;cursor:pointer;margin:12px 0}button:disabled{opacity:.6;cursor:wait}
+#status{white-space:pre-wrap;font-size:13px}summary{cursor:pointer}pre{font-size:11px;white-space:pre-wrap;max-height:150px;overflow:auto}
+</style>
+<h1>Sửa giao diện máy tính · v2</h1>
+<div class="panel">10 màn hình khách hàng được dựng từ website ở <b>1440px</b>: đăng ký, xác minh email, quên mật khẩu, cửa hàng, chi tiết sản phẩm, giỏ hàng, thanh toán, theo dõi đơn hàng, thông tin cá nhân, sổ địa chỉ.</div>
+<p class="note">Thay nội dung trong đúng frame desktop cũ, giữ ID và bản điện thoại. Chữ, hình và biểu tượng vẫn là các layer có thể chỉnh sửa. Có bản sao lưu nội dung cũ trong section ẩn.</p>
+<button id="run">Cập nhật 10 màn hình máy tính</button>
+<p id="status" role="status"></p>
+<details id="report" hidden><summary>Kết quả kiểm tra</summary><pre id="result"></pre></details>
+<script id="layouts" type="application/json">__LAYOUTS__</script>
+<script>
+const run=document.getElementById('run'),status=document.getElementById('status');
+run.onclick=()=>{run.disabled=true;parent.postMessage({pluginMessage:{type:'repair',data:JSON.parse(document.getElementById('layouts').textContent)}},'*')};
+onmessage=({data})=>{const message=data.pluginMessage;if(!message)return;status.textContent=message.text;
+if(message.type==='error')run.disabled=false;
+if(message.type==='done'){run.textContent='Đã cập nhật 10 màn hình';document.getElementById('report').hidden=false;document.getElementById('result').textContent=JSON.stringify(message.result,null,2)}
+};
+</script></html>

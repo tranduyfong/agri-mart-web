@@ -22,14 +22,39 @@ const getShippingFee = () => {
     return fee;
 };
 
-const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '') => {
+const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '', buyNow) => {
     if (checkoutKey) {
         const existing = await Order.findOne({ user_id: userId, checkout_key: checkoutKey });
         if (existing) return { checkout: await getCheckout(userId, existing.checkout_code) };
     }
-    const cart = await cartService.getCart(userId);
-    const items = cart.filter((item) => cartItemIds.includes(item.id));
-    if (items.length !== cartItemIds.length || !items.length) throw new Error('CART_CHANGED');
+    let items;
+    if (buyNow) {
+        const product = await Product.findOne({ 'variants._id': buyNow.variant_id, status: 'PUBLISHED' }).populate('category_id', 'name');
+        const variant = product?.variants.id(buyNow.variant_id);
+        if (!variant) throw new Error('PRODUCT_NOT_FOUND');
+        const discounts = await require('./product.services').getProductDiscounts([product._id]);
+        items = [
+            {
+                product_id: product.id,
+                variant_id: variant._id.toString(),
+                name: product.name,
+                variant_name: variant.name,
+                category_name: product.category_id?.name || '',
+                unit: variant.unit,
+                quantity: buyNow.quantity,
+                list_price: variant.list_price,
+                step_quantity: variant.step_quantity,
+                stock_quantity: availableStock(variant),
+                status: product.status,
+                thumbnail_url: product.images[0] || null,
+                discount_percent: discounts[product.id] || 0
+            }
+        ];
+    } else {
+        const cart = await cartService.getCart(userId);
+        items = cart.filter((item) => cartItemIds.includes(item.id));
+        if (items.length !== cartItemIds.length || !items.length) throw new Error('CART_CHANGED');
+    }
 
     let subtotal = 0;
     let total = 0;
@@ -38,6 +63,7 @@ const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '') => 
         const quantity = Math.round(item.quantity * 1000);
         if (
             item.status !== 'PUBLISHED' ||
+            !Number.isFinite(item.quantity) ||
             item.quantity > item.stock_quantity ||
             item.quantity <= 0 ||
             Math.abs(item.quantity * 1000 - quantity) > 0.00001 ||
@@ -192,7 +218,12 @@ const createCheckout = async (userId, data) => {
             throw new Error('VNPAY_NOT_CONFIGURED');
         }
 
-        const selectedItems = data.cart_item_ids.map((id) => user.cart_items.id(id));
+        let selectedItems;
+        if (data.buy_now) {
+            const product = await Product.findOne({ 'variants._id': data.buy_now.variant_id, status: 'PUBLISHED' }).session(session);
+            if (!product) throw new Error('PRODUCT_NOT_FOUND');
+            selectedItems = [{ product_id: product._id, variant_id: data.buy_now.variant_id, quantity: data.buy_now.quantity }];
+        } else selectedItems = data.cart_item_ids.map((id) => user.cart_items.id(id));
         if (selectedItems.some((item) => !item)) throw new Error('CART_CHANGED');
         const costReceipts = await GoodsReceipt.find({
             created_at: { $lte: now }
@@ -233,6 +264,7 @@ const createCheckout = async (userId, data) => {
             const units = Math.round(cartItem.quantity * 1000);
             const step = Math.round(variant.step_quantity * 1000);
             if (
+                !Number.isFinite(cartItem.quantity) ||
                 cartItem.quantity <= 0 ||
                 Math.abs(cartItem.quantity * 1000 - units) > 0.00001 ||
                 units % step !== 0 ||
@@ -305,6 +337,7 @@ const createCheckout = async (userId, data) => {
                     code: checkoutCode,
                     checkout_code: checkoutCode,
                     checkout_key: data.checkout_key,
+                    purchase_mode: data.buy_now ? 'BUY_NOW' : 'CART',
                     user_id: user._id,
                     total_amount: subtotal,
                     discount_amount: discountAmount + couponDiscount,
@@ -328,8 +361,10 @@ const createCheckout = async (userId, data) => {
             { session }
         );
 
-        user.cart_items = user.cart_items.filter((item) => !data.cart_item_ids.includes(item._id.toString()));
-        await user.save({ session });
+        if (!data.buy_now) {
+            user.cart_items = user.cart_items.filter((item) => !data.cart_item_ids.includes(item._id.toString()));
+            await user.save({ session });
+        }
         return checkoutCode;
     });
 
@@ -427,6 +462,7 @@ const updatePayment = async (payment) => {
                     }
                     await product.save({ session });
                     if (user) {
+                        if (order.purchase_mode === 'BUY_NOW') continue;
                         const cartItem = user.cart_items.find((entry) => entry.variant_id.equals(item.variant_id));
                         if (cartItem) {
                             cartItem.quantity = Math.round((cartItem.quantity + item.quantity) * 1000) / 1000;

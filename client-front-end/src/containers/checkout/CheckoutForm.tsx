@@ -24,18 +24,27 @@ import { getErrorMessage } from '../../utils/errorMessage';
 import { getOrderResultPath, ROUTES } from '../../utils/constants';
 import { emailRules, phoneRules, requiredRule } from '../../utils/validationRules';
 import type { AccountData, UserAddress } from '../../types/account';
-import type { CheckoutFormValues, CheckoutPreview } from '../../types/order';
+import type { BuyNowSelection, CheckoutFormValues, CheckoutPreview } from '../../types/order';
 
 interface CheckoutFormProps {
   account: AccountData;
   preview: CheckoutPreview;
   cartItemIds: string[];
+  buyNow?: BuyNowSelection;
   checkoutKey: string;
   sessionToken: string;
   onReload: () => void;
 }
 
-const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken, onReload }: CheckoutFormProps) => {
+const CheckoutForm = ({
+  account,
+  preview,
+  cartItemIds,
+  buyNow,
+  checkoutKey,
+  sessionToken,
+  onReload,
+}: CheckoutFormProps) => {
   const [form] = Form.useForm<CheckoutFormValues>();
   const [addresses, setAddresses] = useState(account.addresses);
   const initialAddress = account.addresses.find((address) => address.is_default) || account.addresses[0];
@@ -72,7 +81,7 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
     setIsApplyingCoupon(true);
     setCouponError('');
     try {
-      const result = await orderService.getPreview(cartItemIds, checkoutKey, code);
+      const result = await orderService.getPreview(cartItemIds, checkoutKey, code, buyNow);
       if (getSavedAccessToken() !== sessionToken) return;
       if ('checkout' in result) {
         navigate(getOrderResultPath(result.checkout.checkout_code), { replace: true });
@@ -105,6 +114,7 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
         ...values,
         address_id: selectedAddress.id,
         cart_item_ids: cartItemIds,
+        buy_now: buyNow,
         checkout_key: checkoutKey,
         expected_total: summary.total,
         coupon_code: summary.coupon?.code || '',
@@ -364,8 +374,11 @@ const CheckoutForm = ({ account, preview, cartItemIds, checkoutKey, sessionToken
             </p>
           </OrderSummary>
           <div className="mt-5 text-center">
-            <Link to={ROUTES.CART} className="text-sm font-semibold text-gray-500 hover:text-primary">
-              Quay lại giỏ hàng
+            <Link
+              to={buyNow ? ROUTES.SHOP : ROUTES.CART}
+              className="text-sm font-semibold text-gray-500 hover:text-primary"
+            >
+              {buyNow ? 'Tiếp tục mua sắm' : 'Quay lại giỏ hàng'}
             </Link>
           </div>
         </div>

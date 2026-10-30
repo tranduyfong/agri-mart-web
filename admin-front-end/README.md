@@ -19,6 +19,7 @@ Mở **http://localhost:5177**. Backend chạy cổng 8000, `VITE_API_URL` đặ
 | Đường dẫn | Chức năng |
 | --- | --- |
 | `/` | Tổng quan doanh thu, giá vốn, lợi nhuận và biểu đồ theo ngày |
+| `/product-changes` | Duyệt/từ chối thay đổi sản phẩm và phiếu nhập của nhân viên; xem trước/sau và lịch sử |
 | `/accounts` | Tra cứu/lọc tài khoản, thêm nhân viên, sửa thông tin/email mọi vai trò, khóa/mở khóa |
 | `/permissions?id=...` | Chọn nhân viên và các nhóm quyền chức năng |
 | `/reports/revenue` | Doanh thu, giá vốn, lợi nhuận, đối chiếu thanh toán, CSV tổng hợp/theo ngày |
@@ -36,6 +37,8 @@ Cấu trúc `src`: `app`, `pages`, `containers`, `components`, `context`, `hooks
 - Bảy nhóm quyền giữ trong User.permissions, áp dụng cho cửa hàng. Backend đọc lại quyền ở mỗi request. Lưu quyền kiểm tra phiên bản để tránh ghi đè đồng thời.
 
 ## Báo cáo
+
+Mục **Duyệt sản phẩm** mặc định lọc yêu cầu chờ duyệt, tự tải lại mỗi 10 giây. Mở **Xét duyệt** để xem thông tin, giá bán, ảnh và tồn/giá nhập đề nghị; phiếu Excel hiển thị từng dòng/lô/hạn dùng. **Duyệt thay đổi** mới áp dụng vào dữ liệu đang bán; **Từ chối** cần lý do để nhân viên xem và gửi lại. Có thể lọc lịch sử đã duyệt/từ chối. Nếu sản phẩm đã đổi sau khi gửi yêu cầu, hệ thống chặn ghi đè; từ chối yêu cầu cũ để nhân viên gửi lại.
 
 Khoảng ngày tính theo Việt Nam, tối đa 367 ngày. Doanh thu lấy tiền cuối cùng của đơn hoàn tất PAID/REFUNDED, gồm phí giao sau ưu đãi; phần hoàn tiền trình bày riêng. Lợi nhuận gộp = doanh thu − hoàn tiền − giá vốn, chưa trừ vận hành/giao hàng.
 

@@ -24,9 +24,10 @@ const Subscriber = require('../src/models/subscriber');
 const Newsletter = require('../src/models/newsletter');
 const ChatRoom = require('../src/models/chatRoom');
 const ChatMessage = require('../src/models/chatMessage');
+const ProductChange = require('../src/models/productChange');
 const orderService = require('../src/services/order.services');
 const { getToday } = require('../src/utils/date.util');
-let database, server, staff, customer, token, customerToken, otherToken, limitedToken;
+let database, server, staff, customer, token, customerToken, otherToken, limitedToken, adminToken;
 let baseUrl,
     logs = '';
 const uploadedPaths = [];
@@ -90,6 +91,7 @@ before(
         staff = await User.findOne({ role: 'STAFF' });
         customer = await User.findOne({ role: 'CUSTOMER' });
         token = sign(staff);
+        adminToken = sign(await User.findOne({ role: 'ADMIN' }));
         customerToken = sign(customer);
         const other = await User.create({
             email: 'other@example.invalid',
@@ -164,7 +166,7 @@ test('API kiểm tra vai trò và quyền ngay trên server', async () => {
     assert.ok(products.data.some((item) => item.code === 'DEMO-SP001'));
 });
 
-test('Danh mục, sản phẩm nháp và ảnh trước khi đăng bán', async () => {
+test('Danh mục, sản phẩm nháp và ảnh cần được admin duyệt trước khi áp dụng', async () => {
     const category = (await api('/staff/categories', 'POST', { name: 'QA category', slug: 'qa-category' })).data;
     await api('/staff/categories', 'POST', { name: 'Duplicate', slug: 'qa-category' }, token, 400);
     const values = {
@@ -174,9 +176,24 @@ test('Danh mục, sản phẩm nháp và ảnh trước khi đăng bán', async 
         status: 'DRAFT',
         variants: [{ sku: 'QA-SKU', variant_name: 'Gói', unit: 'gói', list_price: 20000, step_quantity: 1 }]
     };
-    const created = (await api('/staff/products', 'POST', values, token, 201)).data;
+    const pending = (await api('/staff/products', 'POST', values, token, 202)).data;
+    assert.equal(await Product.countDocuments({ code: values.code }), 0);
+    await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, token, 403);
+    const created = (
+        await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken)
+    ).data.result;
     await api('/staff/products/' + created.productId, 'PUT', { status: 'PUBLISHED' }, token, 400);
-    await api('/staff/products/' + created.productId, 'PUT', { status: 'PUBLISHED', image_urls: ['https://example.invalid/product.png'] });
+    const update = (
+        await api(
+            '/staff/products/' + created.productId,
+            'PUT',
+            { status: 'PUBLISHED', image_urls: ['https://example.invalid/product.png'] },
+            token,
+            202
+        )
+    ).data;
+    assert.equal((await Product.findById(created.productId)).status, 'DRAFT');
+    await api('/admin/product-changes/' + update.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken);
     const detail = (await api('/staff/products/' + created.productId)).data;
     assert.equal(detail.status, 'PUBLISHED');
     const file = new FormData();
@@ -192,6 +209,7 @@ test('Nhập kho kiểm tra từng dòng, giao dịch và khóa chống nhập t
     const rows = [
         {
             sku: variant.sku,
+            unit: 'Đơn vị từ file không được ghi đè SKU hiện có',
             quantity: 2.5,
             unit_cost: 10000,
             batch_code: 'QA-LOT',
@@ -225,9 +243,20 @@ test('Nhập kho kiểm tra từng dòng, giao dịch và khóa chống nhập t
     });
     assert.equal((await api('/staff/imports/preview', 'POST', { rows })).data.error_rows, 0);
     const body = { rows, import_key: 'qa-success-import-key', source_file: 'test.csv' };
-    const first = (await api('/staff/imports', 'POST', body)).data;
-    const second = (await api('/staff/imports', 'POST', body)).data;
-    assert.equal(first.id, second.id);
+    const firstRequest = (await api('/staff/imports', 'POST', body, token, 202)).data;
+    const second = (await api('/staff/imports', 'POST', body, token, 202)).data;
+    assert.equal(firstRequest.request_id, second.request_id);
+    const proposal = (await api('/admin/product-changes/' + firstRequest.request_id, 'GET', undefined, adminToken)).data;
+    assert.equal(proposal.rows[0].unit, variant.unit);
+    assert.equal(proposal.rows[0].name, product.name);
+    assert.equal(proposal.rows[0].row_number, 1);
+    assert.equal(await GoodsReceipt.countDocuments({ import_key: body.import_key }), 0);
+    assert.equal(await Product.countDocuments({ code: 'QA-IMPORT' }), 0);
+    const approved = (
+        await api('/admin/product-changes/' + firstRequest.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken)
+    ).data;
+    const first = (await api('/staff/imports/' + approved.result.receipt_id)).data;
+    await api('/admin/product-changes/' + firstRequest.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken, 409);
     assert.equal(await GoodsReceipt.countDocuments({ import_key: body.import_key }), 1);
     const saved = await Product.findById(product._id);
     assert.equal(saved.variants[0].stocks.find((stock) => stock.batch_code === 'QA-LOT').quantity, 2.5);
@@ -462,7 +491,11 @@ test('Tồn ban đầu lưu cùng phiếu nhập, giá nhập và hạn dùng; d
             }
         ]
     };
-    const result = (await api('/staff/products', 'POST', values, token, 201)).data;
+    const pending = (await api('/staff/products', 'POST', values, token, 202)).data;
+    assert.equal(await Product.countDocuments({ code: values.code }), 0);
+    const result = (
+        await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken)
+    ).data.result;
     const product = await Product.findById(result.productId);
     assert.equal(product.variants[0].stocks[0].quantity, 12.5);
     const receipt = await GoodsReceipt.findOne({ 'items.product_id': product._id });
@@ -651,4 +684,169 @@ test('Realtime từ chối khách, nhân viên thiếu quyền và token sai; th
     await waitUntil(() => !socket.connected);
     assert.equal(received, false);
     await assert.rejects(connectOrders(sign(watcher)), /FORBIDDEN/);
+});
+
+test('Mua ngay thanh toán đúng số lượng, không thay đổi giỏ, vẫn cần duyệt đơn và chống đặt lặp', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP001' });
+    const variant = product.variants[0];
+    const originalCart = (await User.findById(customer._id)).cart_items.toObject();
+    const buy_now = { variant_id: variant._id.toString(), quantity: variant.step_quantity };
+    const checkout_key = 'qa-direct-purchase-key';
+    await api('/order/preview', 'POST', { buy_now: { ...buy_now, quantity: 0 }, checkout_key }, customerToken, 400);
+    await api('/order/preview', 'POST', { buy_now: { ...buy_now, quantity: variant.step_quantity / 2 }, checkout_key }, customerToken, 409);
+    await api(
+        '/order/preview',
+        'POST',
+        { buy_now, cart_item_ids: [new mongoose.Types.ObjectId().toString()], checkout_key },
+        customerToken,
+        400
+    );
+    const preview = (await api('/order/preview', 'POST', { buy_now, checkout_key }, customerToken)).data;
+    assert.equal(preview.items.length, 1);
+    assert.equal(preview.items[0].quantity, buy_now.quantity);
+    assert.equal(preview.items[0].variant_id, buy_now.variant_id);
+    assert.deepEqual((await User.findById(customer._id)).cart_items.toObject(), originalCart);
+    const body = {
+        buy_now,
+        checkout_key,
+        address_id: customer.addresses[0]._id.toString(),
+        recipient_name: 'Mua trực tiếp',
+        phone: '0900000001',
+        email: customer.email,
+        payment_method: 'VNPAY',
+        expected_total: preview.total
+    };
+    const created = (await api('/order/checkout', 'POST', body, customerToken, 201)).data;
+    const duplicate = (await api('/order/checkout', 'POST', body, customerToken, 201)).data;
+    assert.equal(duplicate.checkout_code, created.checkout_code);
+    assert.equal(await Order.countDocuments({ checkout_key }), 1);
+    const order = await Order.findOne({ checkout_key });
+    assert.equal(order.purchase_mode, 'BUY_NOW');
+    assert.equal(order.items[0].quantity, buy_now.quantity);
+    await api('/order/' + created.checkout_code + '/payment-url', 'POST', {}, customerToken, 409);
+    await api('/staff/orders/' + order.id + '/status', 'PATCH', { expected_status: 'PENDING', status: 'CONFIRMED', note: '' });
+    await api('/order/' + created.checkout_code + '/payment-url', 'POST', {}, customerToken);
+    await orderService.updatePayment({
+        vnp_TxnRef: created.checkout_code,
+        vnp_Amount: preview.total,
+        vnp_ResponseCode: '24',
+        vnp_TransactionStatus: '02'
+    });
+    assert.equal((await Order.findById(order._id)).status, 'CANCELLED');
+    assert.deepEqual((await User.findById(customer._id)).cart_items.toObject(), originalCart);
+});
+
+test('Sửa sản phẩm qua API cũ cũng chờ duyệt; người khác không xem được; từ chối giữ nguyên dữ liệu', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP002' });
+    const pending = (await api('/product/' + product.id, 'PUT', { name: 'Tên chưa được duyệt', status: 'ARCHIVED' }, token, 202)).data;
+    assert.equal((await Product.findById(product._id)).name, product.name);
+    assert.equal((await api('/product/' + product.slug)).data.name, product.name);
+    await api('/staff/product-changes/' + pending.request_id, 'GET', undefined, otherToken, 404);
+    await api('/admin/product-changes', 'GET', undefined, customerToken, 403);
+    await api('/staff/products/' + product.id, 'PUT', { name: 'Thay đổi thứ hai' }, token, 409);
+    const list = await api('/admin/product-changes?status=PENDING', 'GET', undefined, adminToken);
+    assert.ok(list.data.some((change) => change._id === pending.request_id));
+    const detail = (await api('/admin/product-changes/' + pending.request_id, 'GET', undefined, adminToken)).data;
+    assert.equal(detail.before.name, product.name);
+    assert.equal(detail.after.name, 'Tên chưa được duyệt');
+    assert.equal('data' in detail, false);
+    await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'REJECTED', note: '' }, adminToken, 400);
+    await api(
+        '/admin/product-changes/' + pending.request_id + '/review',
+        'PATCH',
+        { status: 'REJECTED', note: 'Tên sản phẩm chưa phù hợp' },
+        adminToken
+    );
+    assert.equal((await Product.findById(product._id)).status, product.status);
+    const rejected = (await api('/staff/product-changes/' + pending.request_id)).data;
+    assert.equal(rejected.review_note, 'Tên sản phẩm chưa phù hợp');
+    assert.equal(rejected.status, 'REJECTED');
+});
+
+test('Duyệt đồng thời chỉ áp dụng một lần; chặn nội dung cũ và quyền người gửi đã bị thu hồi', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP003' });
+    const pending = (await api('/staff/products/' + product.id, 'PUT', { description: 'Nội dung đã duyệt' }, token, 202)).data;
+    const lot = product.variants[0].stocks.find((entry) => entry.quantity > 1);
+    lot.quantity -= 1;
+    await product.save();
+    const responses = await Promise.all(
+        [1, 2].map(() =>
+            fetch(baseUrl + '/admin/product-changes/' + pending.request_id + '/review', {
+                method: 'PATCH',
+                headers: { ...headers(adminToken), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'APPROVED', note: '' })
+            })
+        )
+    );
+    assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+    assert.equal((await Product.findById(product._id)).description, 'Nội dung đã duyệt');
+    assert.equal(
+        (await Product.findById(product._id)).variants[0].stocks.find((entry) => entry.batch_code === lot.batch_code).quantity,
+        lot.quantity
+    );
+    const stale = (await api('/staff/products/' + product.id, 'PUT', { description: 'Bản cũ' }, token, 202)).data;
+    await Product.updateOne({ _id: product._id }, { name: 'Admin vừa chỉnh tên' });
+    await api('/admin/product-changes/' + stale.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken, 409);
+    assert.equal((await ProductChange.findById(stale.request_id)).status, 'PENDING');
+    await api(
+        '/admin/product-changes/' + stale.request_id + '/review',
+        'PATCH',
+        { status: 'REJECTED', note: 'Gửi lại nội dung mới' },
+        adminToken
+    );
+    const requester = await User.create({
+        email: 'review-revoked@example.invalid',
+        full_name: 'Revoked',
+        password_hash: 'unused',
+        status: 'ACTIVE',
+        role: 'STAFF',
+        permissions: ['PRODUCT_MANAGE']
+    });
+    const revoked = (
+        await api(
+            '/product',
+            'POST',
+            { name: 'Không được áp dụng', code: 'QA-REVOKED', category_id: product.category_id.toString(), status: 'DRAFT', variants: [] },
+            sign(requester),
+            202
+        )
+    ).data;
+    await User.updateOne({ _id: requester._id }, { permissions: [] });
+    await api('/admin/product-changes/' + revoked.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken, 409);
+    assert.equal(await Product.countDocuments({ code: 'QA-REVOKED' }), 0);
+});
+
+test('Phiếu nhập qua API cũ cũng chờ duyệt; lỗi khi áp dụng hủy toàn bộ cập nhật và giữ yêu cầu chờ xử lý', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP001' });
+    const variant = product.variants[0];
+    const pending = (
+        await api(
+            '/product/import',
+            'POST',
+            {
+                items: [
+                    { sku: variant.sku, quantity: 2, unit_cost: 10000, batch_code: 'QA-ATOMIC-FIRST', expiry_date: '2099-12-31' },
+                    { sku: variant.sku, quantity: 2, unit_cost: 12000, batch_code: 'QA-ATOMIC-CONFLICT', expiry_date: '2099-12-31' }
+                ]
+            },
+            token,
+            202
+        )
+    ).data;
+    assert.ok(!(await Product.findById(product._id)).variants[0].stocks.some((lot) => lot.batch_code === 'QA-ATOMIC-FIRST'));
+    product.variants[0].stocks.push({ batch_code: 'QA-ATOMIC-CONFLICT', quantity: 5, expiry_date: new Date('2098-01-01') });
+    await product.save();
+    const receiptsBefore = await GoodsReceipt.countDocuments();
+    await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken, 400);
+    const unchanged = await Product.findById(product._id);
+    assert.ok(!unchanged.variants[0].stocks.some((lot) => lot.batch_code === 'QA-ATOMIC-FIRST'));
+    assert.equal(unchanged.variants[0].stocks.find((lot) => lot.batch_code === 'QA-ATOMIC-CONFLICT').quantity, 5);
+    assert.equal(await GoodsReceipt.countDocuments(), receiptsBefore);
+    assert.equal((await ProductChange.findById(pending.request_id)).status, 'PENDING');
+    await api(
+        '/admin/product-changes/' + pending.request_id + '/review',
+        'PATCH',
+        { status: 'REJECTED', note: 'Ngày lô đã thay đổi' },
+        adminToken
+    );
 });

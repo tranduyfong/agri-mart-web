@@ -1,4 +1,6 @@
 const productService = require('../services/product.services');
+const productChangeService = require('../services/productChange.services');
+const { staffErrorResponse } = require('../utils/staffError.util');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
 const { getPagination, buildPagination } = require('../utils/pagination.util');
@@ -118,13 +120,20 @@ const addProduct = async (req, res) => {
             uploaded_files: uploadedFiles
         };
         productData.user_id = req.user.userId;
-        productData.can_import = req.user.role === 'ADMIN' || req.staff?.user.permissions.includes('INVENTORY_MANAGE');
+        productData.can_import = req.user.role === 'ADMIN' || req.user.permissions.includes('INVENTORY_MANAGE');
+
+        if (req.user.role !== 'ADMIN') {
+            const pending = await productChangeService.submitProduct(req.user.userId, 'CREATE', productData);
+            return successResponse(res, pending, null, 'Đã gửi sản phẩm chờ quản trị viên duyệt', 202);
+        }
 
         const result = await productService.createProduct(productData);
         return successResponse(res, result, null, 'Thêm sản phẩm thành công', 201);
     } catch (error) {
         // Lưu DB lỗi thì xóa ảnh vừa upload, tránh rác trên server
         deleteUploadedFiles(uploadedFiles);
+
+        if (['PRODUCT_CHANGE_PENDING', 'PRODUCT_CODE_EXISTS'].includes(error.message)) return staffErrorResponse(res, error);
 
         if (error.message === 'INVENTORY_PERMISSION_REQUIRED')
             return errorResponse(res, 'FORBIDDEN', 'Cần quyền quản lý kho để nhập tồn ban đầu', 403);
@@ -154,7 +163,7 @@ const updateProduct = async (req, res) => {
     try {
         const { code, name, description, category_id, status, variants, delete_image_ids } = req.body || {};
 
-        const result = await productService.updateProduct({
+        const productData = {
             id: req.params.id,
             code,
             name,
@@ -166,12 +175,20 @@ const updateProduct = async (req, res) => {
             delete_image_urls: parseJsonField(req.body?.delete_image_urls),
             image_urls: parseJsonField(req.body?.image_urls),
             uploaded_files: uploadedFiles
-        });
+        };
+
+        if (req.user.role !== 'ADMIN') {
+            const pending = await productChangeService.submitProduct(req.user.userId, 'UPDATE', productData);
+            return successResponse(res, pending, null, 'Đã gửi thay đổi chờ quản trị viên duyệt', 202);
+        }
+        const result = await productService.updateProduct(productData);
 
         return successResponse(res, result, null, 'Cập nhật sản phẩm thành công');
     } catch (error) {
         // Lưu DB lỗi thì xóa ảnh mới vừa upload
         deleteUploadedFiles(uploadedFiles);
+
+        if (['PRODUCT_CHANGE_PENDING', 'PRODUCT_CODE_EXISTS'].includes(error.message)) return staffErrorResponse(res, error);
 
         if (error.name === 'VersionError') {
             return errorResponse(res, 'CONFLICT', 'Sản phẩm vừa thay đổi. Vui lòng thử lại.', 409);
@@ -214,12 +231,22 @@ const importGoods = async (req, res) => {
     try {
         const { supplier_id, note, items } = req.body || {};
 
-        const result = await productService.importGoods({
+        const data = {
             items,
             supplier_id,
             note,
             user_id: req.user.userId
-        });
+        };
+        if (req.user.role !== 'ADMIN') {
+            return successResponse(
+                res,
+                await productChangeService.submitImport(req.user.userId, data),
+                null,
+                'Đã gửi phiếu nhập chờ duyệt',
+                202
+            );
+        }
+        const result = await productService.importGoods(data);
 
         return successResponse(
             res,
@@ -228,6 +255,7 @@ const importGoods = async (req, res) => {
             `Nhập hàng thành công ${result.total_rows} dòng (tạo mới ${result.created_products} sản phẩm, ${result.created_variants} SKU)`
         );
     } catch (error) {
+        if (error.message === 'IMPORT_INVALID_ROWS') return staffErrorResponse(res, error);
         if (error.message === 'INVALID_ROWS') {
             return errorResponse(res, 'VALIDATION_FAILED', `Có ${error.rows.length} dòng bị lỗi, vui lòng sửa lại`, 400, error.rows);
         }

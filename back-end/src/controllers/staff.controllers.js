@@ -60,7 +60,14 @@ const previewImport = async (req, res) => {
 };
 const confirmImport = async (req, res) => {
     try {
-        return successResponse(res, await inventoryService.confirmImport(req.user.userId, req.body || {}), null, 'Đã ghi nhận phiếu nhập');
+        const result = await inventoryService.confirmImport(req.user.userId, req.body || {});
+        return successResponse(
+            res,
+            result,
+            null,
+            result.request_id ? 'Đã gửi phiếu nhập chờ quản trị viên duyệt' : 'Đã ghi nhận phiếu nhập',
+            result.request_id ? 202 : 200
+        );
     } catch (error) {
         return staffErrorResponse(res, error);
     }

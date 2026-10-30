@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 export const NAV_ITEMS = [
   { path: '/', label: 'Tổng quan', icon: <AppstoreOutlined /> },
+  { path: '/product-changes', label: 'Duyệt sản phẩm', icon: <SafetyCertificateOutlined /> },
   { path: '/accounts', label: 'Tài khoản', icon: <TeamOutlined /> },
   { path: '/permissions', label: 'Phân quyền', icon: <SafetyCertificateOutlined /> },
   { path: '/reports/revenue', label: 'Báo cáo doanh thu', icon: <BarChartOutlined /> },

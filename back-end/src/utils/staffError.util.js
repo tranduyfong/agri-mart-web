@@ -1,6 +1,18 @@
 const { errorResponse } = require('./response.util');
 
 const messages = {
+    PRODUCT_CHANGE_PENDING: [409, 'Sản phẩm đã có thay đổi đang chờ duyệt. Vui lòng chờ quản trị viên xử lý.'],
+    PRODUCT_CHANGE_REVIEWED: [409, 'Yêu cầu đã được xử lý. Vui lòng tải lại danh sách.'],
+    PRODUCT_CHANGE_STALE: [409, 'Thông tin sản phẩm đã thay đổi sau khi gửi duyệt. Hãy từ chối và yêu cầu nhân viên gửi lại.'],
+    PRODUCT_CODE_EXISTS: [400, 'Mã sản phẩm hoặc SKU đã tồn tại'],
+    REQUESTER_UNAVAILABLE: [409, 'Người gửi không còn hoạt động hoặc đã bị thu hồi quyền thực hiện thay đổi'],
+    PRODUCT_NOT_FOUND: [404, 'Sản phẩm không tồn tại'],
+    CATEGORY_NOT_FOUND: [400, 'Danh mục không tồn tại'],
+    VARIANT_NOT_FOUND: [400, 'Quy cách không tồn tại trong sản phẩm'],
+    IMAGE_NOT_FOUND: [400, 'Ảnh cần xóa không còn trong sản phẩm'],
+    PRODUCT_HAS_NO_VARIANT: [400, 'Sản phẩm cần có quy cách trước khi đăng bán'],
+    INVALID_PRODUCT_DATA: [400, 'Thông tin sản phẩm không hợp lệ'],
+    INVENTORY_PERMISSION_REQUIRED: [403, 'Người gửi cần quyền quản lý kho để nhập tồn ban đầu'],
     ADMIN_PROTECTED: [403, 'Thao tác này chỉ áp dụng cho tài khoản nhân viên hoặc khách hàng phù hợp'],
     INVALID_REPORT_RANGE: [400, 'Khoảng ngày không hợp lệ. Chọn từ ngày đến ngày, tối đa 367 ngày.'],
     ADDRESS_API_UNAVAILABLE: [503, 'Chưa tải được địa chỉ. Vui lòng thử lại sau.'],

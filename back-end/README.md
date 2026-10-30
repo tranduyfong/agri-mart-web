@@ -73,6 +73,8 @@ Thôn/ấp/tổ dân phố nhập tại `hamlet`. Phải có thôn/ấp hoặc s
 
 ## Thanh toán và VNPay
 
+**Mua ngay** tại chi tiết sản phẩm mở thẳng thanh toán với quy cách/số lượng đã chọn, không thêm hoặc xóa món trong giỏ. API preview/checkout nhận `buy_now: { variant_id, quantity }` thay cho `cart_item_ids`; không gửi cả hai kiểu lựa chọn cùng lúc. Giá, ưu đãi, hạn dùng và tồn được kiểm tra lại trên server. Đơn này vẫn chờ nhân viên xác nhận trước khi thanh toán VNPay. Gửi lại cùng `checkout_key` không tạo đơn hoặc trừ kho lần nữa.
+
 Chọn các sản phẩm trong giỏ và bấm **Thanh toán**. Màn hình tự chọn địa chỉ mặc định, cho phép đổi địa chỉ đã lưu, thêm địa chỉ và sửa thông tin người nhận cho riêng đơn này. Hỗ trợ COD và VNPay.
 
 Các biến backend cần cấu hình trong `.env`:
@@ -135,6 +137,16 @@ Nhóm API `/api/staff` yêu cầu ADMIN/STAFF và quyền tương ứng: `sessio
 Chạy `npm run test:staff` để kiểm tra trên MongoDB tạm và SMTP giả. Không sử dụng cấu hình Atlas/email thật khi kiểm thử.
 
 ### Quản trị hệ thống
+
+**Duyệt sản phẩm:** thao tác thêm/sửa sản phẩm hoặc nhập hàng của STAFF tạo `ProductChange` chờ duyệt, trả HTTP 202 cùng `{ request_id, status }`. Chưa ghi Product/GoodsReceipt hay cộng tồn. ADMIN vào mục **Duyệt sản phẩm** để so sánh trước/sau hoặc xem từng dòng nhập, chấp nhận hoặc từ chối kèm lý do. STAFF xem các yêu cầu của mình ở mục **Yêu cầu sản phẩm**. Danh sách tự cập nhật mỗi 10 giây.
+
+- `GET /admin/product-changes`, `GET /admin/product-changes/:id`, `PATCH /admin/product-changes/:id/review` với `{ status: 'APPROVED' | 'REJECTED', note }`.
+- `GET /staff/product-changes`, `GET /staff/product-changes/:id`: chỉ xem yêu cầu do chính tài khoản gửi.
+- Áp dụng cho cả `/staff/products`, `/staff/imports` và các API cũ `/product`, `/product/:id`, `/product/import`; không cho dùng đường dẫn cũ để bỏ qua xét duyệt.
+- Duyệt và áp dụng dữ liệu dùng cùng transaction; duyệt lặp/đồng thời không áp dụng hai lần. Nhập lỗi hủy toàn bộ phiếu và cập nhật tồn. Kiểm tra lại trạng thái/quyền người gửi, SKU, giá, ngày và thông tin hiện tại khi duyệt. Nội dung sản phẩm đã đổi trong lúc chờ cần từ chối để gửi lại; số lượng tồn đổi do đặt hàng không cản trở duyệt thông tin.
+- ADMIN trực tiếp thao tác bằng API sản phẩm/nhập kho vẫn lưu ngay. Phiếu nhập được duyệt tạo SKU mới ở DRAFT như trước; gửi thay đổi tiếp theo nếu muốn đăng bán. Một sản phẩm chỉ có một yêu cầu sửa đang chờ. Lịch sử yêu cầu giữ ảnh trước/sau để đối chiếu.
+
+Chỉ thêm một model `ProductChange` cho cả ba loại yêu cầu. Không cần chuyển dữ liệu cũ; khởi động lại backend để tạo collection/index mới.
 
 Project `../admin-front-end` chạy cổng 5177, dùng API `/api/admin` chỉ dành cho ADMIN. Xem [README quản trị](../admin-front-end/README.md) để biết màn hình, quyền và định nghĩa chỉ số báo cáo.
 

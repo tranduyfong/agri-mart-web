@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const orderSchema = new Schema({
+    purchase_mode: {
+        type: String,
+        enum: ['CART', 'BUY_NOW'],
+        default: 'CART'
+    },
     status_history: [{
         _id: false,
         status: {

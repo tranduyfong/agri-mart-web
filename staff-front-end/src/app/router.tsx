@@ -19,6 +19,7 @@ import BannerFormPage from '../pages/BannerFormPage';
 import NewsletterListPage from '../pages/NewsletterListPage';
 import NewsletterEditorPage from '../pages/NewsletterEditorPage';
 import SupportPage from '../pages/SupportPage';
+import ProductChangesPage from '../pages/ProductChangesPage';
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'product-changes', element: <ProductChangesPage /> },
       {
         path: 'products',
         element: (

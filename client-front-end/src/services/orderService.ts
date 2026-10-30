@@ -1,13 +1,14 @@
 import apiClient from './apiClient';
 import type { ApiResponse, PaginatedResponse } from '../types/api';
-import type { CheckoutOrder, CheckoutPreview, CheckoutRequest } from '../types/order';
+import type { BuyNowSelection, CheckoutOrder, CheckoutPreview, CheckoutRequest } from '../types/order';
 
-const getPreview = async (cartItemIds: string[], checkoutKey: string, couponCode = '') => {
+const getPreview = async (cartItemIds: string[], checkoutKey: string, couponCode = '', buyNow?: BuyNowSelection) => {
   return (
     await apiClient.post<ApiResponse<CheckoutPreview | { checkout: CheckoutOrder }>>('/order/preview', {
       cart_item_ids: cartItemIds,
       checkout_key: checkoutKey,
       coupon_code: couponCode,
+      buy_now: buyNow,
     })
   ).data.data;
 };

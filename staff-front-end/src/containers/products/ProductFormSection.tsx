@@ -45,7 +45,7 @@ const required = [{ required: true, message: 'Vui lòng nhập thông tin' }];
 const ProductForm = ({ product, lookups }: { product: ProductDetail | null; lookups: Lookups }) => {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const [files, setFiles] = useState<UploadFile[]>([]),
     [removed, setRemoved] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
@@ -94,8 +94,8 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
         if (file.originFileObj) data.append('images', file.originFileObj);
       });
       await productService.saveProduct(product?.id, data);
-      message.success('Đã lưu sản phẩm');
-      navigate('/products');
+      message.success(user?.role === 'ADMIN' ? 'Đã lưu sản phẩm' : 'Đã gửi yêu cầu chờ quản trị viên duyệt');
+      navigate(user?.role === 'ADMIN' ? '/products' : '/product-changes');
     } catch (reason) {
       setError(getErrorMessage(reason));
     } finally {
@@ -118,6 +118,13 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
       }
     >
       <div className="space-y-6">
+        {user?.role !== 'ADMIN' && (
+          <Alert
+            type="info"
+            showIcon
+            title="Thay đổi được gửi chờ quản trị viên duyệt. Sản phẩm đang bán chưa thay đổi cho đến khi được chấp nhận."
+          />
+        )}
         <Panel title="Thông tin cơ bản">
           <div className="grid gap-x-6 md:grid-cols-2">
             <Form.Item name="name" label="Tên sản phẩm *" rules={required}>
@@ -359,7 +366,7 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
             <Button disabled={busy}>Hủy</Button>
           </Link>
           <Button type="primary" htmlType="submit" loading={busy}>
-            Lưu sản phẩm
+            {user?.role === 'ADMIN' ? 'Lưu sản phẩm' : 'Gửi duyệt sản phẩm'}
           </Button>
         </div>
       </div>

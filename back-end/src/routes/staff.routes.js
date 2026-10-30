@@ -7,11 +7,14 @@ const { loadStaffContext } = require('../middlewares/staff.middleware');
 const { requirePermission } = require('../middlewares/permission.middleware');
 const { uploadImages } = require('../middlewares/upload.middleware');
 const router = express.Router();
+const productChangeController = require('../controllers/productChange.controllers');
 
 router.use(verifyToken, verifyAdminOrStaff, loadStaffContext);
 router.get('/session', controller.getSession);
 router.get('/lookups', controller.getLookups);
 router.get('/dashboard', controller.getDashboard);
+router.get('/product-changes', productChangeController.getChanges);
+router.get('/product-changes/:id', productChangeController.getChange);
 router.get('/products', requirePermission('PRODUCT_MANAGE'), productController.getManageProducts);
 router.get('/products/:id', requirePermission('PRODUCT_MANAGE'), productController.getManageProductDetail);
 router.post('/products', requirePermission('PRODUCT_MANAGE'), uploadImages, productController.addProduct);

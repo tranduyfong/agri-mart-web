@@ -1,0 +1,217 @@
+{
+  "fileUrl": "https://www.figma.com/design/AVHxdgKfgepM7o7kBjah5d",
+  "preparedOn": "2026-10-28",
+  "status": "prepared_not_applied_in_figma_due_to_mcp_starter_limit",
+  "screens": [
+    {
+      "key": "C03",
+      "name": "Đăng ký",
+      "existingDesktopId": "8:2",
+      "width": 1440,
+      "height": 1290,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 67,
+        "frame": 184,
+        "svg": 11,
+        "contentImages": 1
+      },
+      "preview": "previews/C03.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C04",
+      "name": "Xác minh email",
+      "existingDesktopId": "7:2",
+      "width": 1440,
+      "height": 1269,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 53,
+        "frame": 136,
+        "svg": 9,
+        "contentImages": 1
+      },
+      "preview": "previews/C04.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C05",
+      "name": "Quên mật khẩu",
+      "existingDesktopId": "6:2",
+      "width": 1440,
+      "height": 1269,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 51,
+        "frame": 128,
+        "svg": 9,
+        "contentImages": 1
+      },
+      "preview": "previews/C05.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C06",
+      "name": "Cửa hàng",
+      "existingDesktopId": "19:2",
+      "width": 1440,
+      "height": 1846,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 164,
+        "frame": 510,
+        "svg": 75,
+        "contentImages": 20
+      },
+      "preview": "previews/C06.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C07",
+      "name": "Chi tiết sản phẩm",
+      "existingDesktopId": "18:2",
+      "width": 1440,
+      "height": 2286,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 140,
+        "frame": 359,
+        "svg": 41,
+        "contentImages": 11
+      },
+      "preview": "previews/C07.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C08",
+      "name": "Giỏ hàng của bạn",
+      "existingDesktopId": "17:2",
+      "width": 1440,
+      "height": 1643,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 88,
+        "frame": 232,
+        "svg": 25,
+        "contentImages": 3
+      },
+      "preview": "previews/C08.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C09",
+      "name": "Thanh toán",
+      "existingDesktopId": "16:2",
+      "width": 1440,
+      "height": 2019,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 110,
+        "frame": 282,
+        "svg": 25,
+        "contentImages": 1
+      },
+      "preview": "previews/C09.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C10",
+      "name": "Theo dõi đơn hàng",
+      "existingDesktopId": "11:2",
+      "width": 1440,
+      "height": 2714,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 145,
+        "frame": 373,
+        "svg": 35,
+        "contentImages": 6
+      },
+      "preview": "previews/C10.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C13",
+      "name": "Thông tin cá nhân",
+      "existingDesktopId": "15:2",
+      "width": 1440,
+      "height": 1325,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 66,
+        "frame": 194,
+        "svg": 24,
+        "contentImages": 0
+      },
+      "preview": "previews/C13.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    },
+    {
+      "key": "C14",
+      "name": "Sổ địa chỉ",
+      "existingDesktopId": "14:2",
+      "width": 1440,
+      "height": 1139,
+      "viewport": {
+        "width": 1440,
+        "documentWidth": 1440,
+        "desktop": true
+      },
+      "sourceRuntimeErrors": [],
+      "sourceLayerCounts": {
+        "text": 66,
+        "frame": 181,
+        "svg": 26,
+        "contentImages": 0
+      },
+      "preview": "previews/C14.png",
+      "nativeFigmaAudit": "not_run_due_to_mcp_starter_limit"
+    }
+  ]
+}

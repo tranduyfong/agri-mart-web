@@ -11,6 +11,7 @@ import {
 export const NAV_ITEMS = [
   { path: '/', label: 'Công việc hôm nay', icon: <AppstoreOutlined />, permission: '' },
   { path: '/products', label: 'Sản phẩm', icon: <ProductOutlined />, permission: 'PRODUCT_MANAGE' },
+  { path: '/product-changes', label: 'Yêu cầu sản phẩm', icon: <ProductOutlined />, permission: '' },
   { path: '/categories', label: 'Danh mục', icon: <AppstoreOutlined />, permission: 'PRODUCT_MANAGE' },
   { path: '/imports', label: 'Nhập hàng', icon: <InboxOutlined />, permission: 'INVENTORY_MANAGE' },
   { path: '/inventory', label: 'Tồn kho & hạn dùng', icon: <InboxOutlined />, permission: 'INVENTORY_MANAGE' },

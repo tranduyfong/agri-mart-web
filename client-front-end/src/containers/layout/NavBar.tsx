@@ -61,12 +61,12 @@ const NavBar = () => {
     { key: ROUTES.ORDERS, label: 'Theo dõi đơn hàng', icon: <TruckOutlined /> },
     ...(user
       ? [
-          {
-            key: ROUTES.ACCOUNT,
-            label: 'Tài khoản của tôi',
-            icon: <UserOutlined />,
-          },
-        ]
+        {
+          key: ROUTES.ACCOUNT,
+          label: 'Tài khoản của tôi',
+          icon: <UserOutlined />,
+        },
+      ]
       : []),
   ];
 

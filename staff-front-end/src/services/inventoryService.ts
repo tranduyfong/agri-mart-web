@@ -15,5 +15,5 @@ const confirmImport = async (data: {
   source_file: string;
   import_key: string;
   note: string;
-}) => (await apiClient.post<ApiResponse<Receipt>>('/staff/imports', data)).data.data;
+}) => (await apiClient.post<ApiResponse<Receipt | { request_id: string; status: string }>>('/staff/imports', data)).data.data;
 export default { getInventory, previewImport, confirmImport };

@@ -15,6 +15,24 @@ const COUPON_ERRORS = {
 
 const isValidCouponCode = (code) => code === undefined || (typeof code === 'string' && /^[a-zA-Z0-9_-]{0,80}$/.test(code.trim()));
 
+const isValidSelection = (data) => {
+    if (data.buy_now !== undefined) {
+        return (
+            (!data.cart_item_ids || (Array.isArray(data.cart_item_ids) && !data.cart_item_ids.length)) &&
+            mongoose.isObjectIdOrHexString(data.buy_now?.variant_id) &&
+            Number.isFinite(data.buy_now?.quantity) &&
+            data.buy_now.quantity > 0
+        );
+    }
+    return (
+        Array.isArray(data.cart_item_ids) &&
+        data.cart_item_ids.length > 0 &&
+        data.cart_item_ids.length <= 100 &&
+        data.cart_item_ids.every((id) => mongoose.isObjectIdOrHexString(id)) &&
+        new Set(data.cart_item_ids).size === data.cart_item_ids.length
+    );
+};
+
 const getMyOrders = async (req, res) => {
     try {
         const status = req.query.status || '';
@@ -32,24 +50,20 @@ const getMyOrders = async (req, res) => {
 
 const getPreview = async (req, res) => {
     try {
-        const { cart_item_ids, checkout_key, coupon_code } = req.body || {};
+        const { cart_item_ids, checkout_key, coupon_code, buy_now } = req.body || {};
         if (
-            !Array.isArray(cart_item_ids) ||
-            !cart_item_ids.length ||
-            cart_item_ids.length > 100 ||
-            cart_item_ids.some((id) => !mongoose.isObjectIdOrHexString(id)) ||
-            new Set(cart_item_ids).size !== cart_item_ids.length ||
+            !isValidSelection(req.body || {}) ||
             typeof checkout_key !== 'string' ||
             !/^[a-zA-Z0-9-]{16,80}$/.test(checkout_key) ||
             !isValidCouponCode(coupon_code)
         ) {
             return errorResponse(res, 'VALIDATION_FAILED', 'Danh sách sản phẩm thanh toán không hợp lệ', 400);
         }
-        const preview = await orderService.getPreview(req.user.userId, cart_item_ids, checkout_key, coupon_code?.trim());
+        const preview = await orderService.getPreview(req.user.userId, cart_item_ids || [], checkout_key, coupon_code?.trim(), buy_now);
         return successResponse(res, preview);
     } catch (error) {
         if (COUPON_ERRORS[error.message]) return errorResponse(res, error.message, COUPON_ERRORS[error.message], 400);
-        if (error.message === 'CART_CHANGED' || error.message === 'INSUFFICIENT_STOCK') {
+        if (['CART_CHANGED', 'INSUFFICIENT_STOCK', 'PRODUCT_NOT_FOUND'].includes(error.message)) {
             return errorResponse(res, 'CART_CHANGED', 'Giỏ hàng hoặc tồn kho đã thay đổi. Vui lòng kiểm tra lại giỏ hàng.', 409);
         }
         return errorResponse(res, 'INTERNAL_SERVER_ERROR', 'Không thể tải thông tin thanh toán', 500, null, error.message);
@@ -60,11 +74,7 @@ const checkout = async (req, res) => {
     try {
         const data = req.body || {};
         if (
-            !Array.isArray(data.cart_item_ids) ||
-            !data.cart_item_ids.length ||
-            data.cart_item_ids.length > 100 ||
-            data.cart_item_ids.some((id) => !mongoose.isObjectIdOrHexString(id)) ||
-            new Set(data.cart_item_ids).size !== data.cart_item_ids.length ||
+            !isValidSelection(data) ||
             !mongoose.isObjectIdOrHexString(data.address_id) ||
             typeof data.checkout_key !== 'string' ||
             !/^[a-zA-Z0-9-]{16,80}$/.test(data.checkout_key) ||
@@ -86,7 +96,8 @@ const checkout = async (req, res) => {
         }
 
         const order = await orderService.createCheckout(req.user.userId, {
-            cart_item_ids: data.cart_item_ids,
+            cart_item_ids: data.cart_item_ids || [],
+            buy_now: data.buy_now,
             checkout_key: data.checkout_key,
             address_id: data.address_id,
             recipient_name: data.recipient_name.trim(),

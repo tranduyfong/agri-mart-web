@@ -40,6 +40,7 @@ const ImportWizard = () => {
     [receipt, setReceipt] = useState<Receipt | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const [pendingRequest, setPendingRequest] = useState<string | null>(null);
   const busyRef = useRef(false);
   const { message } = App.useApp();
   const updateDraft = (value: Draft) => {
@@ -91,10 +92,11 @@ const ImportWizard = () => {
         source_file: draft.fileName,
         import_key: draft.importKey,
       });
-      setReceipt(result);
+      if ('request_id' in result) setPendingRequest(result.request_id);
+      else setReceipt(result);
       setStep(2);
       sessionStorage.removeItem(storageKey);
-      message.success('Đã nhập kho');
+      message.success('request_id' in result ? 'Đã gửi phiếu nhập chờ quản trị viên duyệt' : 'Đã nhập kho');
     } catch (reason) {
       setError(getErrorMessage(reason));
     } finally {
@@ -107,14 +109,24 @@ const ImportWizard = () => {
     <>
       <PageHeader
         title={
-          step === 2 ? 'Đã ghi nhận phiếu nhập' : step === 1 ? 'Kiểm tra dữ liệu nhập hàng' : 'Nhập hàng từ Excel / CSV'
+          step === 2
+            ? pendingRequest
+              ? 'Đã gửi phiếu nhập chờ duyệt'
+              : 'Đã ghi nhận phiếu nhập'
+            : step === 1
+              ? 'Kiểm tra dữ liệu nhập hàng'
+              : 'Nhập hàng từ Excel / CSV'
         }
         description={draft.fileName || 'Nhập hàng vào kho chung của cửa hàng'}
       />
       <Steps
         className="mb-7"
         current={step}
-        items={[{ title: 'Chọn file' }, { title: 'Kiểm tra dữ liệu' }, { title: 'Ghi nhận nhập kho' }]}
+        items={[
+          { title: 'Chọn file' },
+          { title: 'Kiểm tra dữ liệu' },
+          { title: user?.role === 'ADMIN' ? 'Ghi nhận nhập kho' : 'Gửi quản trị viên duyệt' },
+        ]}
       />
       <div className="space-y-6">
         {step === 0 && (
@@ -241,7 +253,9 @@ const ImportWizard = () => {
               title={
                 preview.error_rows
                   ? `Còn ${preview.error_rows} dòng lỗi. Chưa có dữ liệu nào được nhập kho.`
-                  : 'Tất cả dòng đã hợp lệ. Bạn có thể xác nhận nhập kho.'
+                  : user?.role === 'ADMIN'
+                    ? 'Tất cả dòng đã hợp lệ. Bạn có thể xác nhận nhập kho.'
+                    : 'Tất cả dòng hợp lệ. Gửi quản trị viên duyệt để cập nhật sản phẩm và tồn kho.'
               }
             />
             <div className="flex flex-wrap gap-3">
@@ -249,12 +263,35 @@ const ImportWizard = () => {
                 Chọn lại file / sửa thông tin
               </Button>
               <Button type="primary" disabled={!!preview.error_rows} loading={busy} onClick={confirm}>
-                Xác nhận nhập kho
+                {user?.role === 'ADMIN' ? 'Xác nhận nhập kho' : 'Gửi duyệt phiếu nhập'}
               </Button>
             </div>
           </>
         )}
-        {step === 2 && receipt && (
+        {step === 2 && pendingRequest && (
+          <>
+            <Alert
+              type="success"
+              showIcon
+              title="Phiếu nhập đã được gửi chờ quản trị viên duyệt."
+              description="Sản phẩm mới và tồn kho chỉ được ghi nhận sau khi yêu cầu được chấp nhận."
+            />
+            <Link to="/product-changes">
+              <Button type="primary">Theo dõi yêu cầu</Button>
+            </Link>
+            <Button
+              onClick={() => {
+                updateDraft({ rows: [], fileName: '', importKey: crypto.randomUUID(), note: '' });
+                setStep(0);
+                setPendingRequest(null);
+                setPreview(null);
+              }}
+            >
+              Nhập file khác
+            </Button>
+          </>
+        )}
+        {step === 2 && receipt && !pendingRequest && (
           <>
             <Alert type="success" showIcon title={`Đã nhập ${receipt.items_count} dòng. Tồn kho đã được cập nhật.`} />
             <Panel title="Thông tin ghi nhận">
