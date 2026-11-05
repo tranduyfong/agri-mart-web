@@ -5,6 +5,7 @@ import staffService from '../services/staffService';
 import { clearAuth, getSavedAccessToken, saveAccessToken } from '../utils/authStorage';
 import type { StaffSession } from '../types/staff';
 import useOrderNotifications from '../hooks/useOrderNotifications';
+import useChatNotifications from '../hooks/useChatNotifications';
 
 const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState(getSavedAccessToken);
@@ -16,6 +17,8 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       token === checkedToken &&
       (session?.user.role === 'ADMIN' || !!session?.user.permissions.includes('ORDER_MANAGE')),
   );
+  const chatNotifications = useChatNotifications(token, !!token && token === checkedToken &&
+    (session?.user.role === 'ADMIN' || !!session?.user.permissions.includes('SUPPORT_MANAGE')));
   const logout = useCallback(() => {
     clearAuth();
     setToken(null);
@@ -61,6 +64,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         ...orderNotifications,
+        ...chatNotifications,
         user: token ? session?.user || null : null,
         loading: !!token && token !== checkedToken,
         login,

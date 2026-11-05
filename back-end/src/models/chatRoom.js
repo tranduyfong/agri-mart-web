@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const chatRoomSchema = new Schema({
+    conversation_key: { type: String },
+    waiting_for_staff: { type: Boolean, default: false },
+    ai_pending: { type: Boolean, default: false },
+    ai_locked_until: { type: Date, default: null },
     customer_id: {
         type: Schema.Types.ObjectId,
         ref: 'User',
@@ -27,5 +31,6 @@ const chatRoomSchema = new Schema({
 });
 
 chatRoomSchema.index({ customer_id: 1, updated_at: -1 });
+chatRoomSchema.index({ conversation_key: 1 }, { unique: true, partialFilterExpression: { conversation_key: { $type: 'string' } } });
 
 module.exports = mongoose.model('ChatRoom', chatRoomSchema);

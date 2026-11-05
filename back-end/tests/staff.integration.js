@@ -31,6 +31,11 @@ let database, server, staff, customer, token, customerToken, otherToken, limited
 let baseUrl,
     logs = '';
 const uploadedPaths = [];
+const makeChatCustomer = async (suffix) => {
+    const user = await User.create({ email: 'chat-' + suffix + '@example.invalid', password_hash: 'unused',
+        full_name: 'Khách chat ' + suffix, role: 'CUSTOMER', status: 'ACTIVE' });
+    return { user, token: sign(user) };
+};
 const cwd = path.resolve(__dirname, '..');
 const headers = (accessToken) => ({ Authorization: 'Bearer ' + accessToken });
 const api = async (url, method = 'GET', body, accessToken = token, expected = 200) => {
@@ -660,8 +665,8 @@ test('Schema và API chỉ dùng một cửa hàng, không tạo model hay colle
     assert.equal((await api('/staff/dashboard')).data.pending, summary.pending_count);
 });
 
-test('Realtime từ chối khách, nhân viên thiếu quyền và token sai; thu hồi quyền ngắt kết nối đang mở', async (t) => {
-    for (const invalid of [customerToken, limitedToken, 'invalid']) {
+test('Realtime từ chối nhân viên thiếu quyền và token sai; thu hồi quyền ngắt kết nối đang mở', async (t) => {
+    for (const invalid of [limitedToken, 'invalid']) {
         await assert.rejects(connectOrders(invalid), /FORBIDDEN/);
     }
     const watcher = await User.create({
@@ -850,3 +855,6 @@ test('Phiếu nhập qua API cũ cũng chờ duyệt; lỗi khi áp dụng hủy
         adminToken
     );
 });
+
+require('./chat.cases')({ test, assert, api, User, ChatRoom, ChatMessage, makeChatCustomer,
+    getTokens: () => ({ token, otherToken, limitedToken }), sign, connectOrders, waitUntil, uploadedPaths, cwd, getBaseUrl: () => baseUrl });

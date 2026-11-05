@@ -24,5 +24,6 @@ router.use('/staff', require('./staff.routes'));
 router.use('/admin', require('./admin.routes'));
 router.use('/newsletter', require('./newsletter.routes'));
 router.use('/banners', require('./banner.routes'));
+router.use('/chat', require('./chat.routes'));
 
 module.exports = router;

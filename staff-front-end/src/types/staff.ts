@@ -159,12 +159,31 @@ export interface ChatRoom {
   id: string;
   customer_name: string;
   status: string;
+  waiting_for_staff: boolean;
+  ai_pending: boolean;
+  ai_enabled: boolean;
   assigned_staff_id: string | null;
   staff_name?: string;
   updated_at: string;
+  customer_id: string | null;
+  customer_avatar: string | null;
+  unread_count: number;
+  last_message: { content: string; sender_type: string; has_images: boolean; created_at: string } | null;
+}
+export interface ChatMessage {
+  id: string;
+  client_id: string | null;
+  sender_id: string | null;
+  sender_name: string;
+  sender_type: string;
+  content: string;
+  attachments: string[];
+  created_at: string;
+  recommendations?: { variant_id: string; name: string; quantity: number; unit: string; available: boolean }[];
 }
 export interface ChatDetail extends ChatRoom {
-  messages: { id: string; sender_type: string; content: string; attachments: string[]; created_at: string }[];
+  messages: ChatMessage[];
+  has_more: boolean;
 }
 export interface Dashboard {
   pending: number;

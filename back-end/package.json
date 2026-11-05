@@ -12,6 +12,7 @@
         "migrate:single-store": "node migrate-single-store.js",
         "test": "node --test tests/*.test.js",
         "test:staff": "node --test tests/staff.integration.js",
+        "test:ai": "node --test tests/ai.integration.js",
         "test:admin": "node --test tests/admin.integration.js",
         "test:store": "node --test tests/singleStore.integration.js"
     },

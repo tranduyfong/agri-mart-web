@@ -17,11 +17,12 @@ const isValidCouponCode = (code) => code === undefined || (typeof code === 'stri
 
 const isValidSelection = (data) => {
     if (data.buy_now !== undefined) {
+        const selections = Array.isArray(data.buy_now) ? data.buy_now : [data.buy_now];
         return (
             (!data.cart_item_ids || (Array.isArray(data.cart_item_ids) && !data.cart_item_ids.length)) &&
-            mongoose.isObjectIdOrHexString(data.buy_now?.variant_id) &&
-            Number.isFinite(data.buy_now?.quantity) &&
-            data.buy_now.quantity > 0
+            selections.length > 0 && selections.length <= 5 &&
+            selections.every((item) => mongoose.isObjectIdOrHexString(item?.variant_id) && Number.isFinite(item?.quantity) && item.quantity > 0) &&
+            new Set(selections.map((item) => String(item.variant_id).toLowerCase())).size === selections.length
         );
     }
     return (

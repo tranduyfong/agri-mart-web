@@ -29,27 +29,29 @@ const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '', buy
     }
     let items;
     if (buyNow) {
-        const product = await Product.findOne({ 'variants._id': buyNow.variant_id, status: 'PUBLISHED' }).populate('category_id', 'name');
-        const variant = product?.variants.id(buyNow.variant_id);
-        if (!variant) throw new Error('PRODUCT_NOT_FOUND');
-        const discounts = await require('./product.services').getProductDiscounts([product._id]);
-        items = [
-            {
+        const selections = Array.isArray(buyNow) ? buyNow : [buyNow];
+        items = [];
+        for (const selection of selections) {
+            const product = await Product.findOne({ 'variants._id': selection.variant_id, status: 'PUBLISHED' }).populate('category_id', 'name');
+            const variant = product?.variants.id(selection.variant_id);
+            if (!variant) throw new Error('PRODUCT_NOT_FOUND');
+            const discounts = await require('./product.services').getProductDiscounts([product._id]);
+            items.push({
                 product_id: product.id,
                 variant_id: variant._id.toString(),
                 name: product.name,
                 variant_name: variant.name,
                 category_name: product.category_id?.name || '',
                 unit: variant.unit,
-                quantity: buyNow.quantity,
+                quantity: selection.quantity,
                 list_price: variant.list_price,
                 step_quantity: variant.step_quantity,
                 stock_quantity: availableStock(variant),
                 status: product.status,
                 thumbnail_url: product.images[0] || null,
                 discount_percent: discounts[product.id] || 0
-            }
-        ];
+            });
+        }
     } else {
         const cart = await cartService.getCart(userId);
         items = cart.filter((item) => cartItemIds.includes(item.id));
@@ -220,9 +222,13 @@ const createCheckout = async (userId, data) => {
 
         let selectedItems;
         if (data.buy_now) {
-            const product = await Product.findOne({ 'variants._id': data.buy_now.variant_id, status: 'PUBLISHED' }).session(session);
-            if (!product) throw new Error('PRODUCT_NOT_FOUND');
-            selectedItems = [{ product_id: product._id, variant_id: data.buy_now.variant_id, quantity: data.buy_now.quantity }];
+            const selections = Array.isArray(data.buy_now) ? data.buy_now : [data.buy_now];
+            selectedItems = [];
+            for (const selection of selections) {
+                const product = await Product.findOne({ 'variants._id': selection.variant_id, status: 'PUBLISHED' }).session(session);
+                if (!product) throw new Error('PRODUCT_NOT_FOUND');
+                selectedItems.push({ product_id: product._id, variant_id: selection.variant_id, quantity: selection.quantity });
+            }
         } else selectedItems = data.cart_item_ids.map((id) => user.cart_items.id(id));
         if (selectedItems.some((item) => !item)) throw new Error('CART_CHANGED');
         const costReceipts = await GoodsReceipt.find({

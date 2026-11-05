@@ -5,7 +5,7 @@ import Logo from '../../components/Logo';
 import { NAV_ITEMS } from '../../utils/constants';
 import useAuth from '../../hooks/useAuth';
 const Sidebar = ({ onNavigate }: { onNavigate?: () => void }) => {
-  const { user, hasPermission, logout, pendingCount } = useAuth();
+  const { user, hasPermission, logout, pendingCount, chatUnreadCount } = useAuth();
   return (
     <div className="flex min-h-full flex-col p-4">
       <div className="px-2 pb-5 pt-3">
@@ -28,6 +28,7 @@ const Sidebar = ({ onNavigate }: { onNavigate?: () => void }) => {
             {item.path === '/orders' && (
               <Badge className="ml-auto" count={pendingCount} title={`${pendingCount} đơn chờ duyệt`} />
             )}
+            {item.path === '/support' && <Badge className="ml-auto" count={chatUnreadCount} title={`${chatUnreadCount} tin nhắn chưa đọc`} />}
           </NavLink>
         ))}
       </nav>

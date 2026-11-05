@@ -7,6 +7,9 @@ interface AuthValue {
   pendingCount: number;
   ordersRevision: number;
   ordersConnected: boolean;
+  chatUnreadCount: number;
+  chatRevision: number;
+  chatConnected: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;

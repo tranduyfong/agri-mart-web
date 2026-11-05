@@ -62,7 +62,7 @@ export interface CheckoutFormValues {
 }
 
 export interface CheckoutRequest extends CheckoutFormValues {
-  buy_now?: BuyNowSelection;
+  buy_now?: BuyNowPurchase;
   address_id: string;
   cart_item_ids: string[];
   checkout_key: string;
@@ -74,3 +74,5 @@ export interface BuyNowSelection {
   variant_id: string;
   quantity: number;
 }
+
+export type BuyNowPurchase = BuyNowSelection | BuyNowSelection[];

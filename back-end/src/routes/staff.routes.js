@@ -5,7 +5,8 @@ const categoryController = require('../controllers/category.controllers');
 const { verifyToken, verifyAdminOrStaff } = require('../middlewares/auth.middleware');
 const { loadStaffContext } = require('../middlewares/staff.middleware');
 const { requirePermission } = require('../middlewares/permission.middleware');
-const { uploadImages } = require('../middlewares/upload.middleware');
+const { uploadImages, uploadChatImages } = require('../middlewares/upload.middleware');
+const chatController = require('../controllers/chat.controllers');
 const router = express.Router();
 const productChangeController = require('../controllers/productChange.controllers');
 
@@ -45,9 +46,11 @@ router.post('/newsletters', requirePermission('NEWSLETTER_MANAGE'), controller.s
 router.put('/newsletters/:id', requirePermission('NEWSLETTER_MANAGE'), controller.saveNewsletter);
 router.post('/newsletters/:id/send', requirePermission('NEWSLETTER_MANAGE'), controller.sendNewsletter);
 router.get('/support', requirePermission('SUPPORT_MANAGE'), controller.getRooms);
+router.get('/support/summary', requirePermission('SUPPORT_MANAGE'), chatController.getSummary(false));
 router.get('/support/:id', requirePermission('SUPPORT_MANAGE'), controller.getRoom);
 router.post('/support/:id/claim', requirePermission('SUPPORT_MANAGE'), controller.claimRoom);
-router.post('/support/:id/messages', requirePermission('SUPPORT_MANAGE'), uploadImages, controller.reply);
+router.post('/support/:id/messages', requirePermission('SUPPORT_MANAGE'), uploadChatImages, controller.reply);
+router.post('/support/:id/read', requirePermission('SUPPORT_MANAGE'), chatController.markRead(false));
 router.post('/support/:id/close', requirePermission('SUPPORT_MANAGE'), controller.closeRoom);
 
 module.exports = router;

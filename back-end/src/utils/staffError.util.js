@@ -1,6 +1,7 @@
 const { errorResponse } = require('./response.util');
 
 const messages = {
+    CHAT_INVALID_IMAGE: [400, 'Ảnh không hợp lệ. Chọn JPG, PNG, GIF hoặc WEBP, mỗi ảnh tối đa 5 MB.'],
     PRODUCT_CHANGE_PENDING: [409, 'Sản phẩm đã có thay đổi đang chờ duyệt. Vui lòng chờ quản trị viên xử lý.'],
     PRODUCT_CHANGE_REVIEWED: [409, 'Yêu cầu đã được xử lý. Vui lòng tải lại danh sách.'],
     PRODUCT_CHANGE_STALE: [409, 'Thông tin sản phẩm đã thay đổi sau khi gửi duyệt. Hãy từ chối và yêu cầu nhân viên gửi lại.'],

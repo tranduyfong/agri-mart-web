@@ -162,3 +162,36 @@ Project `../admin-front-end` chạy cổng 5177, dùng API `/api/admin` chỉ d�
 ### Chuyển sang một cửa hàng
 
 Xem [hướng dẫn chuyển dữ liệu sang một cửa hàng](SINGLE-STORE.md). Database cũ có Branch cần chuyển một lần trong lúc dừng backend, kể cả chỉ từng có một cơ sở. Script tự sao lưu dữ liệu trước khi áp dụng. Không dùng seed để gộp dữ liệu.
+
+### Nhắn tin khách hàng và nhân viên
+
+Giữ hai model `ChatRoom`, `ChatMessage`; thêm khóa hội thoại/gửi tin chống trùng và `read_by` để lưu số chưa đọc theo tài khoản. Không cần tạo model mới. Khởi động lại backend để tạo index. Hội thoại có sẵn vẫn đọc được; các tin cũ chưa có `read_by` được tính là chưa đọc.
+
+- Khách hàng: `GET /api/chat`, `GET /api/chat/summary`, `POST /api/chat/messages`, `POST /api/chat/:id/read`.
+- Nhân viên có `SUPPORT_MANAGE`: `GET /api/staff/support?status=&keyword=`, `GET /api/staff/support/summary`, `GET /api/staff/support/:id`, `POST /api/staff/support/:id/claim`, `/messages`, `/read`, `/close`.
+- API lịch sử nhận `before=<message_id>` và trả 50 tin cùng `has_more`. API đọc nhận `{ through_id }`, chỉ đánh dấu tới tin đó trong đúng hội thoại.
+- Gửi tin bằng multipart: `content`, `client_id` (UUID cho mỗi lần gửi), `images` (tối đa 3 ảnh, 5 MB/ảnh). Gửi lại cùng `client_id` không tạo bản sao. Backend kiểm tra loại ảnh, giới hạn file và dọn ảnh của yêu cầu thất bại.
+
+Socket cấu hình ở `src/configs/socket.config.js`. Sự kiện `chat:changed` chỉ chứa `room_id`, gửi sau khi lưu thành công tới đúng khách và nhân viên có quyền hỗ trợ; nội dung tải lại qua API có xác thực. Đánh dấu đọc chỉ báo lại các phiên của chính người đọc. Quyền đơn hàng và quyền hỗ trợ được kiểm tra riêng.
+
+`npm run test:staff` bao gồm kiểm thử chat đồng thời, gửi lại, ảnh hai chiều, phân trang, chưa đọc, quyền truy cập và Socket. Các bài kiểm thử dùng database tạm và không gửi email thật.
+
+### Trợ lý Gemini và gợi ý mua hàng
+
+Cấu hình trong `.env` của backend (không đặt key trong frontend hoặc commit):
+
+```env
+GEMINI_ENABLED=true
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash-lite
+```
+
+`src/configs/gemini.config.js` gọi API Google bằng `fetch` có timeout 45 giây và [JSON schema](https://ai.google.dev/gemini-api/docs/structured-output). `src/services/chatAi.services.js` đọc catalog, kiểm tra gợi ý và lưu tin AI. Không thêm collection hoặc thư viện AI mới.
+
+- AI chỉ tư vấn cửa hàng, chọn sản phẩm, bảo quản và cách mua hàng. Câu hỏi ngoài phạm vi được từ chối; yêu cầu người thật, xử lý đơn/khiếu nại, ảnh đính kèm hoặc lỗi Gemini chuyển sang chờ nhân viên. Nhân viên tiếp nhận thì AI dừng, kể cả đang chờ Google phản hồi.
+- Chỉ gửi lịch sử chữ gần nhất và catalog công khai sang Google; không gửi hồ sơ khách, sổ địa chỉ, đơn hàng, ảnh hoặc giá nhập. Không có công cụ cho AI tự tạo/duyệt đơn hay thanh toán.
+- Gợi ý tối đa 5 quy cách còn bán, đủ lượng theo bước bán và lô chưa hết hạn. Giá áp dụng ưu đãi tự động giống checkout. ID do AI trả về phải thuộc catalog đã gửi; tồn được đọc lại trước khi lưu và mỗi lần hiển thị thẻ. Thẻ cũ hết hàng/ngừng bán bị khóa đặt.
+- Khách đặt từng món hoặc cả nhóm bằng `buy_now` (một object như trước hoặc mảng 1–5 `{ variant_id, quantity }` khác nhau). Preview và đặt đơn đều tính lại giá/kho; trừ kho trong transaction, một phí giao, không sửa giỏ hàng. Vẫn phải chọn địa chỉ, xác nhận đặt và chờ nhân viên duyệt.
+- Hàng đợi lưu `ai_pending` và thời hạn khóa trên `ChatRoom`; kiểm tra mỗi 3 giây, tối đa 2 yêu cầu Google đồng thời trên mỗi tiến trình. `reply_to` duy nhất ngăn trả lời lặp; câu hỏi mới đến trong lúc AI soạn sẽ thay thế câu cũ. Khởi động lại tiếp tục các yêu cầu đang chờ sau khi khóa cũ hết hạn.
+
+Đặt `GEMINI_ENABLED=false` để chỉ dùng nhân viên. Chạy `npm run test:ai` để kiểm thử Gemini giả và DB tạm, gồm tồn hết hạn, giá ưu đãi, ID/số lượng sai, chuyển nhân viên, lỗi Google, câu hỏi mới và checkout nhiều món. `npm test` kiểm tra thêm cấu hình/schema API; các bài tự động không gọi Google thật.

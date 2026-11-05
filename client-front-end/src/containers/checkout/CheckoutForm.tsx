@@ -24,13 +24,13 @@ import { getErrorMessage } from '../../utils/errorMessage';
 import { getOrderResultPath, ROUTES } from '../../utils/constants';
 import { emailRules, phoneRules, requiredRule } from '../../utils/validationRules';
 import type { AccountData, UserAddress } from '../../types/account';
-import type { BuyNowSelection, CheckoutFormValues, CheckoutPreview } from '../../types/order';
+import type { BuyNowPurchase, CheckoutFormValues, CheckoutPreview } from '../../types/order';
 
 interface CheckoutFormProps {
   account: AccountData;
   preview: CheckoutPreview;
   cartItemIds: string[];
-  buyNow?: BuyNowSelection;
+  buyNow?: BuyNowPurchase;
   checkoutKey: string;
   sessionToken: string;
   onReload: () => void;

@@ -207,14 +207,14 @@ const sendNewsletter = async (req, res) => {
 };
 const getRooms = async (req, res) => {
     try {
-        return successResponse(res, await supportService.getRooms(req.query.status));
+        return successResponse(res, await supportService.getRooms(req.query.status, req.user.userId, req.query.keyword || ''));
     } catch (error) {
         return staffErrorResponse(res, error);
     }
 };
 const getRoom = async (req, res) => {
     try {
-        return successResponse(res, await supportService.getRoom(req.params.id));
+        return successResponse(res, await supportService.getRoom(req.params.id, req.user.userId, false, req.query.before));
     } catch (error) {
         return staffErrorResponse(res, error);
     }
@@ -228,9 +228,9 @@ const claimRoom = async (req, res) => {
 };
 const reply = async (req, res) => {
     try {
-        return successResponse(res, await supportService.reply(req.user.userId, req.params.id, req.body?.content || '', req.files));
+        return successResponse(res, await supportService.reply(req.user.userId, req.params.id, req.body?.content ?? '', req.files, req.body?.client_id));
     } catch (error) {
-        deleteUploadedFiles(req.files || []);
+        if (!error.keepUploads) deleteUploadedFiles(req.files || []);
         return staffErrorResponse(res, error);
     }
 };

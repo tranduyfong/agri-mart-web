@@ -90,3 +90,13 @@ npm run test:staff
 ```
 
 `test:staff` tự tạo MongoDB replica set tạm và giả lập gửi email, không dùng Atlas hoặc gửi email thật. Lần đầu có thể cần tải binary MongoDB. Kiểm tra các luồng phân quyền, sản phẩm, nhập kho, trạng thái đơn, callback VNPay sau hủy một phần, khuyến mãi, banner, bản tin và hội thoại.
+
+## Tin nhắn khách hàng
+
+Tài khoản cần quyền `SUPPORT_MANAGE`. Mục **Chăm sóc khách hàng** có số tin chưa đọc màu đỏ, cập nhật qua Socket ngay cả khi đang ở màn hình khác. Vào mục này rồi chọn hội thoại để đọc; bấm **Tiếp nhận cuộc trò chuyện** trước khi trả lời. Chỉ nhân viên đã tiếp nhận được gửi tin hoặc kết thúc hỗ trợ.
+
+Hỗ trợ chữ, tối đa 3 ảnh/tin (JPG/PNG/WEBP/GIF, 5 MB/ảnh), xem ảnh lớn và tải lịch sử trước. Enter gửi, Shift + Enter xuống dòng. Giao diện điện thoại có nút quay lại danh sách. Số chưa đọc được lưu riêng theo người đọc; chỉ cập nhật khi thực sự mở hội thoại và xem gần cuối lịch sử. Khách nhắn lại sau khi kết thúc sẽ mở lại hội thoại chờ tiếp nhận.
+
+Socket vẫn cấu hình tại `back-end/src/configs/socket.config.js`, dùng token và quyền hiện tại. Ứng dụng kết nối lại và kiểm tra mỗi 10 giây khi mất mạng; không dùng Redux.
+
+Khi bật Gemini, lịch sử hiển thị rõ **Trợ lý AI** và các sản phẩm AI đã gợi ý. Nhân viên có thể tiếp nhận bất cứ lúc nào để dừng AI và tự trả lời. Khách bấm **Gặp nhân viên**, gửi ảnh hoặc Gemini lỗi sẽ chuyển hội thoại sang chờ nhân viên; các tin tiếp theo không bị AI trả lời chen vào.

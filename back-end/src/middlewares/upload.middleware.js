@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { errorResponse } = require('../utils/response.util');
+const { deleteUploadedFiles } = require('../utils/file.util');
 
 // Cấu hình nơi lưu trữ và tên file
 const storage = multer.diskStorage({
@@ -50,6 +51,7 @@ const limits = { fileSize: 10 * 1024 * 1024 }; // Giới hạn mỗi file tối 
 const handleUpload = (multerMiddleware) => {
     return (req, res, next) => {
         multerMiddleware(req, res, (err) => {
+            if (err) deleteUploadedFiles(req.files || []);
             if (err instanceof multer.MulterError) {
                 return errorResponse(res, 'UPLOAD_FAILED', `Lỗi tải file: ${err.message}`, 400);
             } else if (err) {
@@ -62,7 +64,9 @@ const handleUpload = (multerMiddleware) => {
 
 // Ảnh sản phẩm: gửi lên ở field "images", tối đa 10 ảnh -> req.files
 const uploadImages = handleUpload(multer({ storage, fileFilter: imageFilter, limits }).array('images', 10));
+const uploadChatImages = handleUpload(multer({ storage, fileFilter: imageFilter, limits: { fileSize: 5 * 1024 * 1024, files: 3 } }).array('images', 3));
 
 module.exports = {
-    uploadImages
+    uploadImages,
+    uploadChatImages
 };

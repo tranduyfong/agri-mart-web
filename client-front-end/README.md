@@ -1,5 +1,15 @@
 # React + TypeScript + Vite
 
+## Nhắn tin hỗ trợ
+
+Bong bóng chat nằm ở góc dưới bên phải, giữ nguyên khi chuyển trang. Khách hàng đăng nhập có thể gửi chữ và tối đa 3 ảnh mỗi tin (JPG/PNG/WEBP/GIF, 5 MB/ảnh), bấm ảnh để xem lớn. Enter gửi tin, Shift + Enter xuống dòng.
+
+Socket nhận thông báo trực tiếp; số đỏ là số tin chưa đọc và vẫn được giữ sau khi tải lại trang. Chỉ đánh dấu đọc khi khung chat đang mở, tab đang được xem và lịch sử ở gần cuối. Lịch sử cũ có nút tải thêm. Khi mất kết nối, ứng dụng thử kết nối lại và kiểm tra tin mới mỗi 10 giây.
+
+Chạy backend cùng `npm run dev` trong project này. Địa chỉ API lấy từ `VITE_API_URL`; Socket dùng cùng địa chỉ máy chủ đó.
+
+Khi backend bật Gemini, AI tự phản hồi và có thẻ sản phẩm kèm **Đặt sản phẩm này** hoặc **Đặt cả nhóm**. Nút đưa tới checkout, tự lấy địa chỉ mặc định và kiểm tra lại giá/kho, không thêm sản phẩm vào giỏ. Có nút **Gặp nhân viên**; AI dừng sau khi chuyển tiếp hoặc nhân viên tiếp nhận. Cấu hình API key chỉ nằm ở backend.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

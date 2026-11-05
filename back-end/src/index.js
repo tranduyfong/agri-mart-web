@@ -38,6 +38,8 @@ const PORT = process.env.PORT || 8000;
 connection()
     .then(async () => {
         await require('./services/newsletter.services').recoverSending();
+        await Promise.all([require('./models/chatRoom').init(), require('./models/chatMessage').init()]);
+        require('./services/chatAi.services').startWorker();
         server.listen(PORT, () => console.log('Server is running on port ' + PORT));
         let checkingPayments = false;
         const timer = setInterval(async () => {

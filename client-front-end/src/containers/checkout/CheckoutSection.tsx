@@ -12,7 +12,8 @@ import accountService from '../../services/accountService';
 import { getOrderResultPath, ROUTES } from '../../utils/constants';
 import { getErrorMessage } from '../../utils/errorMessage';
 import type { AccountData } from '../../types/account';
-import type { BuyNowSelection, CheckoutPreview } from '../../types/order';
+import type { BuyNowPurchase, CheckoutPreview } from '../../types/order';
+import { getBuyNowSelection } from '../../utils/checkoutSelection';
 
 interface CheckoutData {
   requestKey: string;
@@ -20,7 +21,7 @@ interface CheckoutData {
   preview: CheckoutPreview;
   checkoutKey: string;
   cartItemIds: string[];
-  buyNow?: BuyNowSelection;
+  buyNow?: BuyNowPurchase;
 }
 
 const CheckoutSection = () => {
@@ -39,9 +40,7 @@ const CheckoutSection = () => {
     let outdated = false;
     window.scrollTo({ top: 0, behavior: 'instant' });
     const params = new URLSearchParams(location.search);
-    const buyNow = params.has('variant')
-      ? { variant_id: params.get('variant') || '', quantity: Number(params.get('quantity')) }
-      : undefined;
+    const buyNow = getBuyNowSelection(params);
     const cartItemIds = buyNow ? [] : (params.get('items') || '').split(',').filter(Boolean);
     if (!buyNow && !cartItemIds.length) return;
     const storageKey = 'agrimart.checkout.' + user.id;
@@ -79,11 +78,12 @@ const CheckoutSection = () => {
   }, [sessionToken, user, location.search, requestKey, navigate, dispatch]);
 
   const missingSelection =
+    !new URLSearchParams(location.search).has('buy') &&
     !new URLSearchParams(location.search).has('variant') &&
     !(new URLSearchParams(location.search).get('items') || '').split(',').some(Boolean);
   const data = result?.requestKey === requestKey ? result : null;
   const errorMessage = error?.key === requestKey ? error.message : '';
-  const isBuyNow = new URLSearchParams(location.search).has('variant');
+  const isBuyNow = new URLSearchParams(location.search).has('variant') || new URLSearchParams(location.search).has('buy');
 
   return (
     <div className="flex-1 bg-page-gray pb-16 sm:pb-20">

@@ -5,9 +5,9 @@ const notifyOrdersChanged = () => {
     const io = socketConfig.getIO();
     if (!io) return;
     for (const socket of io.sockets.sockets.values()) {
-        socketConfig.canWatchOrders(socket.handshake.auth?.token).then((allowed) => {
-            if (allowed) socket.emit('orders:changed');
-            else socket.disconnect(true);
+        socketConfig.getSocketUser(socket.handshake.auth?.token).then((user) => {
+            if (!socketConfig.canConnect(user)) socket.disconnect(true);
+            else if (socketConfig.hasSocketPermission(user, 'ORDER_MANAGE')) socket.emit('orders:changed');
         });
     }
 };

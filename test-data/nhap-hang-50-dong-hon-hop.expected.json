@@ -1,0 +1,63 @@
+{
+  "file": "nhap-hang-50-dong-hon-hop.xlsx",
+  "source_file": "nhap-hang-50-san-pham.xlsx",
+  "source_sha256": "a83f4607674cf6869a2610b3acf09022983865f1ae144ec60d40dd80c19dfd3b",
+  "date": "2026-10-31",
+  "total_rows": 50,
+  "old_rows": 10,
+  "valid_new_rows": 30,
+  "valid_rows": 40,
+  "error_rows": 10,
+  "errors": [
+    {
+      "row_number": 42,
+      "label": "Thiếu SKU",
+      "message": "Thiếu SKU hoặc SKU quá dài"
+    },
+    {
+      "row_number": 43,
+      "label": "Số lượng bằng 0",
+      "message": "Số lượng phải dương, tối đa 3 chữ số thập phân"
+    },
+    {
+      "row_number": 44,
+      "label": "Số lượng âm",
+      "message": "Số lượng phải dương, tối đa 3 chữ số thập phân"
+    },
+    {
+      "row_number": 45,
+      "label": "Giá nhập âm",
+      "message": "Giá nhập phải là số nguyên không âm"
+    },
+    {
+      "row_number": 46,
+      "label": "Giá nhập có phần thập phân",
+      "message": "Giá nhập phải là số nguyên không âm"
+    },
+    {
+      "row_number": 47,
+      "label": "Thiếu mã lô",
+      "message": "Thiếu mã lô hoặc mã lô quá dài"
+    },
+    {
+      "row_number": 48,
+      "label": "Hạn sử dụng đã hết",
+      "message": "Hạn sử dụng không hợp lệ hoặc đã hết hạn"
+    },
+    {
+      "row_number": 49,
+      "label": "Ngày hết hạn không tồn tại",
+      "message": "Hạn sử dụng không hợp lệ hoặc đã hết hạn"
+    },
+    {
+      "row_number": 50,
+      "label": "Ngày sản xuất ở tương lai",
+      "message": "Ngày sản xuất không hợp lệ"
+    },
+    {
+      "row_number": 51,
+      "label": "Danh mục không tồn tại",
+      "message": "SKU mới cần mã, tên sản phẩm, quy cách và danh mục hợp lệ"
+    }
+  ]
+}
