@@ -1,3 +1,4 @@
+// Luồng đặt hàng và thanh toán: tính lại tiền/kho, tạo đơn chờ xác nhận, xử lý VNPay và hoàn kho khi cần.
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { ProductCode } = require('vnpay');
@@ -12,18 +13,21 @@ const cartService = require('./cart.services');
 const promotionService = require('./promotion.services');
 const { calculateCouponDiscount } = require('../utils/promotion.util');
 const vnpayInstance = require('../configs/vnpay.config');
-const { availableStock } = require('../utils/productStock.util');
+const { availableStock, getSaleQuote } = require('../utils/productStock.util');
 const { normalizeSearch } = require('../utils/string.util');
 const { getToday, parseDate, formatVnpayDate, parseVnpayDate } = require('../utils/date.util');
 
+// Đọc phí giao từ cấu hình và kiểm tra là số tiền nguyên không âm.
 const getShippingFee = () => {
     const fee = Number(process.env.SHIPPING_FEE || 15000);
     if (!Number.isSafeInteger(fee) || fee < 0) throw new Error('INVALID_SHIPPING_CONFIG');
     return fee;
 };
 
+// Tính lại sản phẩm, lượng tồn, giá và mã giảm cho giỏ hoặc mua ngay; bước này chưa tạo đơn.
 const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '', buyNow) => {
     if (checkoutKey) {
+        // Lựa chọn này đã đặt thành đơn thì trả đơn cũ để frontend mở kết quả, thay vì tính lại như một lần mua mới.
         const existing = await Order.findOne({ user_id: userId, checkout_key: checkoutKey });
         if (existing) return { checkout: await getCheckout(userId, existing.checkout_code) };
     }
@@ -44,7 +48,7 @@ const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '', buy
                 category_name: product.category_id?.name || '',
                 unit: variant.unit,
                 quantity: selection.quantity,
-                list_price: variant.list_price,
+                ...getSaleQuote(variant, selection.quantity, discounts[product.id] || 0),
                 step_quantity: variant.step_quantity,
                 stock_quantity: availableStock(variant),
                 status: product.status,
@@ -75,9 +79,9 @@ const getPreview = async (userId, cartItemIds, checkoutKey, couponCode = '', buy
         }
 
         item.discount_percent = Math.min(100, Math.max(0, item.discount_percent || 0));
-        item.price = Math.round(item.list_price * (1 - item.discount_percent / 100));
-        item.line_total = Math.round(item.price * item.quantity);
-        subtotal += Math.round(item.list_price * item.quantity);
+        item.price ??= Math.round(item.list_price * (1 - item.discount_percent / 100));
+        item.line_total ??= Math.round(item.price * item.quantity);
+        subtotal += item.line_subtotal ?? Math.round(item.list_price * item.quantity);
         total += item.line_total;
     }
 
@@ -161,13 +165,18 @@ const buildCheckoutSummary = (orders) => {
                     quantity: item.quantity,
                     list_price: item.list_price ?? item.price,
                     price: item.price,
-                    line_total: Math.round(item.price * item.quantity)
+                    line_total: item.line_total ?? Math.round(item.price * item.quantity),
+                    price_breakdown: (item.stock_allocations || []).filter((lot) => lot.price != null).map((lot) => ({
+                        batch_code: lot.batch_code, expiry_date: lot.expiry_date, quantity: lot.quantity,
+                        list_price: lot.list_price, price: lot.price, line_total: Math.round(lot.price * lot.quantity)
+                    }))
                 };
             })
         )
     };
 };
 
+// Chỉ tìm lần mua thuộc đúng user, kể cả các đơn cũ có cách lưu mã khác.
 const getCheckout = async (userId, checkoutCode) => {
     const orders = await Order.find({
         user_id: userId,
@@ -179,6 +188,7 @@ const getCheckout = async (userId, checkoutCode) => {
     return buildCheckoutSummary(orders);
 };
 
+// Gộp theo lần đặt rồi áp dụng bộ lọc và phân trang cho lịch sử mua của khách.
 const getMyOrders = async (userId, filters, pagination) => {
     const orders = await Order.find({ user_id: userId })
         .populate('items.product_id', 'name images variants')
@@ -202,10 +212,12 @@ const getMyOrders = async (userId, filters, pagination) => {
     };
 };
 
+// Trong một transaction: kiểm tra địa chỉ/giá/kho, xuất lô, lưu đơn chờ nhân viên và cập nhật giỏ khi cần.
 const createCheckout = async (userId, data) => {
     const now = new Date();
     const checkoutCode = 'DH' + crypto.randomUUID().replace(/-/g, '').toUpperCase();
 
+    // Nếu bất kỳ bước ghi đơn/xuất lô nào lỗi, transaction hủy toàn bộ để không mất tồn hoặc tạo đơn thiếu dòng.
     const resultCode = await mongoose.connection.transaction(async (session) => {
         const user = await User.findById(userId).session(session);
         if (!user || user.status !== 'ACTIVE') throw new Error('ACCOUNT_UNAVAILABLE');
@@ -267,6 +279,7 @@ const createCheckout = async (userId, data) => {
             const variant = product?.variants.id(cartItem.variant_id);
             if (!variant) throw new Error('PRODUCT_NOT_FOUND');
 
+            // Đổi lượng thành đơn vị phần nghìn để kiểm tra bội số của step mà hạn chế sai số số thực.
             const units = Math.round(cartItem.quantity * 1000);
             const step = Math.round(variant.step_quantity * 1000);
             if (
@@ -285,28 +298,24 @@ const createCheckout = async (userId, data) => {
                     discount = Math.max(discount, Math.min(100, promotion.discount_value));
                 }
             }
-            const price = Math.round(variant.list_price * (1 - discount / 100));
+            const quote = getSaleQuote(variant, cartItem.quantity, discount);
 
             // Xuất lô còn hạn, ưu tiên lô hết hạn sớm; lưu lại để hoàn đúng lô nếu thanh toán lỗi.
-            const today = parseDate(getToday());
-            const stocks = variant.stocks.filter((stock) => stock.expiry_date >= today).sort((a, b) => a.expiry_date - b.expiry_date);
             const allocations = [];
-            let remaining = cartItem.quantity;
-            for (const stock of stocks) {
-                if (remaining <= 0) break;
-                const taken = Math.min(stock.quantity, remaining);
-                if (taken <= 0) continue;
+            for (const part of quote.price_breakdown) {
+                const stock = variant.stocks.find((lot) => lot.batch_code === part.batch_code);
+                const taken = part.quantity;
                 stock.quantity = Math.round((stock.quantity - taken) * 1000) / 1000;
-                remaining = Math.round((remaining - taken) * 1000) / 1000;
                 allocations.push({
                     batch_code: stock.batch_code,
                     quantity: taken,
+                    list_price: part.list_price,
+                    price: part.price,
                     unit_cost: getAllocationCost(stock, { product_id: product._id, variant_sku: variant.sku }, costReceipts, now),
                     manufactured_date: stock.manufactured_date,
                     expiry_date: stock.expiry_date
                 });
             }
-            if (remaining > 0) throw new Error('INSUFFICIENT_STOCK');
             await product.save({ session });
 
             items.push({
@@ -319,12 +328,14 @@ const createCheckout = async (userId, data) => {
                 unit: variant.unit,
                 thumbnail_url: product.images[0] || null,
                 quantity: cartItem.quantity,
-                list_price: variant.list_price,
-                price,
+                list_price: quote.list_price,
+                price: quote.price,
+                line_total: quote.line_total,
+                line_subtotal: quote.line_subtotal,
                 stock_allocations: allocations
             });
-            subtotal += Math.round(variant.list_price * cartItem.quantity);
-            discountAmount += Math.round(variant.list_price * cartItem.quantity) - Math.round(price * cartItem.quantity);
+            subtotal += quote.line_subtotal;
+            discountAmount += quote.line_subtotal - quote.line_total;
         }
 
         const shippingFee = getShippingFee();
@@ -335,6 +346,7 @@ const createCheckout = async (userId, data) => {
         const total = subtotal - discountAmount + shippingFee - couponDiscount;
         if (!Number.isSafeInteger(total) || total < 0 || (total === 0 && data.payment_method === 'VNPAY'))
             throw new Error('INVALID_AMOUNT');
+        // Frontend chỉ gửi tổng đã nhìn thấy; backend tự tính và yêu cầu xem lại nếu giá/ưu đãi đã đổi.
         if (total !== data.expected_total) throw new Error('PRICE_CHANGED');
 
         await Order.create(
@@ -367,6 +379,7 @@ const createCheckout = async (userId, data) => {
             { session }
         );
 
+        // Chỉ luồng mua từ giỏ mới xóa các dòng đã mua; mua ngay/gợi ý AI giữ nguyên giỏ đang có.
         if (!data.buy_now) {
             user.cart_items = user.cart_items.filter((item) => !data.cart_item_ids.includes(item._id.toString()));
             await user.save({ session });
@@ -378,6 +391,7 @@ const createCheckout = async (userId, data) => {
     return getCheckout(userId, resultCode);
 };
 
+// Chỉ tạo URL VNPay khi đơn đã được duyệt, chưa thanh toán và còn thời hạn.
 const getPaymentUrl = (checkout, ipAddress) => {
     if (!vnpayInstance || !process.env.VNP_RETURN_URL) throw new Error('VNPAY_NOT_CONFIGURED');
     if (checkout.payment_method !== 'VNPAY' || checkout.payment_status === 'PAID' || checkout.status === 'CANCELLED') {
@@ -461,6 +475,7 @@ const updatePayment = async (payment) => {
                             variant.stocks.push({
                                 batch_code: allocation.batch_code,
                                 quantity: allocation.quantity,
+                                list_price: allocation.list_price ?? null,
                                 manufactured_date: allocation.manufactured_date,
                                 expiry_date: allocation.expiry_date
                             });
@@ -494,6 +509,7 @@ const updatePayment = async (payment) => {
     return changed;
 };
 
+// Đối soát giao dịch với VNPay và đọc lại thông tin đơn của khách.
 const checkPayment = async (userId, checkoutCode) => {
     const checkout = await getCheckout(userId, checkoutCode);
     if (
@@ -534,6 +550,7 @@ const checkPayment = async (userId, checkoutCode) => {
     return getCheckout(userId, checkoutCode);
 };
 
+// Tác vụ nền kiểm tra các đơn VNPay đến hạn để xử lý trạng thái còn treo.
 const checkExpiredPayments = async () => {
     if (!vnpayInstance) return;
     const orders = await Order.find({

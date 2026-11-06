@@ -1,3 +1,4 @@
+// Ô tăng/giảm số lượng theo step; giữ lượng chọn trong giới hạn mà component cha cung cấp.
 import { InputNumber } from 'antd';
 import { MinusOutlined, PlusOutlined } from '@ant-design/icons';
 

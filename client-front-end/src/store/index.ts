@@ -1,3 +1,4 @@
+// Ghép các slice Redux của ứng dụng khách và xuất RootState/AppDispatch để các hook sử dụng đúng kiểu.
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import categoryReducer from './slices/categorySlice';

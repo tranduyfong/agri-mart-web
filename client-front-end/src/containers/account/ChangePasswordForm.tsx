@@ -1,3 +1,4 @@
+// Form đổi mật khẩu có đối chiếu phần nhập lại; thành công thì kết thúc phiên cũ.
 import { useState } from 'react';
 import { App, Form } from 'antd';
 import type { Rule } from 'antd/es/form';
@@ -31,6 +32,7 @@ const ChangePasswordForm = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
+  // Gửi mật khẩu cũ/mới; đổi thành công thì xóa phiên phía trình duyệt và yêu cầu đăng nhập lại.
   const handleSubmit = async (values: ChangePasswordFormValues) => {
     const sessionToken = getSavedAccessToken();
     setIsSubmitting(true);

@@ -1,3 +1,4 @@
+// Menu bên trái; tô mục đang mở và hiển thị thông tin tài khoản/đăng xuất.
 import { NavLink } from 'react-router-dom';
 import { LogoutOutlined } from '@ant-design/icons';
 import { Badge } from 'antd';

@@ -1,7 +1,9 @@
+// Xử lý hồ sơ, địa chỉ mặc định và đổi mật khẩu của chính khách đang đăng nhập.
 const bcrypt = require('bcryptjs');
 const User = require('../models/user');
 const addressService = require('./address.services');
 
+// Chỉ lấy thông tin hồ sơ được phép trả ra giao diện, không trả mật khẩu và token bí mật.
 const getProfile = async (userId) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -20,6 +22,7 @@ const getProfile = async (userId) => {
     };
 };
 
+// Cập nhật họ tên/số điện thoại của chính tài khoản; Mongoose kiểm tra xung đột khi lưu.
 const updateProfile = async (userId, { full_name, phone }) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -35,6 +38,7 @@ const updateProfile = async (userId, { full_name, phone }) => {
     return getProfile(userId);
 };
 
+// Đổi các địa chỉ nhúng trong User thành dữ liệu frontend dùng để hiển thị và chọn.
 const getAddresses = async (userId) => {
     const user = await User.findById(userId).select('addresses');
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -56,11 +60,13 @@ const getAddresses = async (userId) => {
         .sort((a, b) => b.is_default - a.is_default);
 };
 
+// Tìm địa chỉ mặc định để màn hình thanh toán tự điền thông tin.
 const getDefaultAddress = async (userId) => {
     const addresses = await getAddresses(userId);
     return addresses.find((address) => address.is_default) || null;
 };
 
+// Xác nhận tỉnh/xã qua API rồi thêm hoặc sửa địa chỉ; xử lý để sổ địa chỉ chỉ có một mặc định.
 const saveAddress = async (userId, addressId, data) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -87,6 +93,7 @@ const saveAddress = async (userId, addressId, data) => {
     return getAddresses(userId);
 };
 
+// Đánh dấu địa chỉ được chọn và bỏ mặc định ở các địa chỉ còn lại.
 const setDefaultAddress = async (userId, addressId) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -100,6 +107,7 @@ const setDefaultAddress = async (userId, addressId) => {
     return getAddresses(userId);
 };
 
+// Xóa địa chỉ thuộc tài khoản; nếu cần thì chọn lại một địa chỉ mặc định còn tồn tại.
 const removeAddress = async (userId, addressId) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -116,6 +124,7 @@ const removeAddress = async (userId, addressId) => {
     return getAddresses(userId);
 };
 
+// Đối chiếu mật khẩu hiện tại, băm mật khẩu mới và tăng token_version để thu hồi phiên cũ.
 const changePassword = async (userId, tokenVersion, currentPassword, newPassword) => {
     const user = await User.findById(userId).select('+password_hash +token_version');
     if (!user) throw new Error('USER_NOT_FOUND');

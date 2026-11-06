@@ -1,3 +1,4 @@
+// Chặn API nếu tài khoản không có nhóm quyền được yêu cầu; ADMIN được phép quản lý các nhóm chức năng.
 const { errorResponse } = require('../utils/response.util');
 
 // verifyToken đã đọc role và permissions mới nhất từ User, không lấy quyền trong JWT.

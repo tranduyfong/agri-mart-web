@@ -1,3 +1,5 @@
+// Quản lý giỏ/yêu thích trong Redux; tuần tự hóa API và đối chiếu token/requestId để phản hồi cũ không ghi đè thao
+// tác mới.
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
 import shoppingService from '../../services/shoppingService';
@@ -27,12 +29,14 @@ const emptyState: ShoppingState = {
 
 // Xếp các lần tải / sửa giỏ theo thứ tự để response cũ không ghi đè thao tác mới
 let requestQueue: Promise<unknown> = Promise.resolve();
+// Nối thao tác vào Promise trước; một request lỗi không làm hàng đợi dừng hẳn.
 const enqueue = <T,>(operation: () => Promise<T>): Promise<T> => {
   const result = requestQueue.then(operation);
   requestQueue = result.catch(() => undefined);
   return result;
 };
 
+// Đổi lỗi HTTP/phiên thành dữ liệu mà thunk và giao diện cùng hiểu.
 const shoppingError = (error: unknown): ShoppingError => ({
   message: getErrorMessage(error),
   unauthorized: axios.isAxiosError(error) && error.response?.status === 401,
@@ -41,6 +45,7 @@ const shoppingError = (error: unknown): ShoppingError => ({
 
 type ThunkConfig = { state: RootState; rejectValue: ShoppingError };
 
+// Thunk tải giỏ/yêu thích theo phiên hiện tại; condition tránh chạy nhiều lần tải trùng nhau.
 export const fetchShopping = createAsyncThunk<
   { sessionToken: string | null; cart: CartItem[]; wishlist: ProductListItem[] }, void, ThunkConfig
 >('shopping/fetch', async (_, { getState, rejectWithValue }) => {
@@ -54,6 +59,7 @@ export const fetchShopping = createAsyncThunk<
   } catch (error) { return rejectWithValue(shoppingError(error)); }
 }, { condition: (_, { getState }) => !!getState().auth.accessToken && getState().shopping.status !== 'loading' });
 
+// Thunk cập nhật qua hàng đợi; state chỉ nhận phản hồi nếu nó vẫn thuộc token đang đăng nhập.
 export const mutateShopping = createAsyncThunk<
   { sessionToken: string; cart?: CartItem[]; wishlist?: ProductListItem[] }, ShoppingMutation, ThunkConfig
 >('shopping/mutate', async (action, { getState, rejectWithValue }) => {
@@ -72,6 +78,7 @@ const shoppingSlice = createSlice({
   name: 'shopping',
   initialState: { ...emptyState, sessionToken: getSavedAccessToken() },
   reducers: {},
+  // Nhận kết quả các thunk; requestId/token loại phản hồi cũ và pendingRequests điều khiển trạng thái bận.
   extraReducers: (builder) => {
     builder
       .addCase(setCredentials, (_, action) => ({ ...emptyState, sessionToken: action.payload.accessToken }))

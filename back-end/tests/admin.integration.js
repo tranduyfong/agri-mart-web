@@ -316,3 +316,5 @@ test('Admin sửa thông tin/email mọi vai trò, email trùng bị chặn và 
     }
     await api('/account', 'GET', undefined, customerToken, 401);
 });
+
+require('./supplier.cases')({ test, assert, api, User, Product, GoodsReceipt, sign, getAdmin: () => admin });

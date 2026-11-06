@@ -1,3 +1,4 @@
+// Nút bộ lọc dạng nhãn; trạng thái được chọn do component cha truyền vào.
 import type { ReactNode } from 'react';
 
 interface FilterChipProps {

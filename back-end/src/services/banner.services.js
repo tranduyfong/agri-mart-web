@@ -1,7 +1,9 @@
+// Quản lý banner và chỉ đưa các ảnh đang bật, đúng lịch ra API khách hàng.
 const mongoose = require('mongoose');
 const Banner = require('../models/banner');
 const { escapeRegex } = require('../utils/string.util');
 
+// Suy ra nháp/sắp diễn ra/đang chạy/đã kết thúc từ cờ bật và thời gian.
 const bannerStatus = (banner) =>
     !banner.is_active
         ? 'DRAFT'
@@ -11,6 +13,7 @@ const bannerStatus = (banner) =>
             ? 'ENDED'
             : 'ACTIVE';
 
+// Lấy danh sách quản lý, gồm cả banner chưa tới lịch và bản nháp.
 const getBanners = async (filters, pagination) => {
     const query = filters.keyword ? { title: { $regex: escapeRegex(filters.keyword), $options: 'i' } } : {};
     const [items, totalElements] = await Promise.all([
@@ -20,6 +23,7 @@ const getBanners = async (filters, pagination) => {
     return { items: items.map((item) => ({ ...item, id: item._id.toString(), status: bannerStatus(item) })), totalElements };
 };
 
+// Đọc một banner để điền form chỉnh sửa.
 const getBanner = async (id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const item = await Banner.findById(id).lean();
@@ -27,6 +31,7 @@ const getBanner = async (id) => {
     return { ...item, id: item._id.toString(), status: bannerStatus(item) };
 };
 
+// Chọn ảnh upload/URL, kiểm tra link và thời gian rồi thêm hoặc sửa banner.
 const saveBanner = async (id, data, files) => {
     if (files?.length > 1) throw new Error('INVALID_DATA');
     const old = id ? await getBanner(id) : null;
@@ -58,6 +63,7 @@ const saveBanner = async (id, data, files) => {
     return { id: item._id.toString() };
 };
 
+// Chỉ trả banner đang bật và nằm trong khoảng thời gian được phép hiển thị.
 const getPublicBanners = async () => {
     const now = new Date();
     const items = await Banner.find({

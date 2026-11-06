@@ -1,3 +1,4 @@
+// Xử lý URL trình duyệt được VNPay trả về rồi chuyển sang trang kết quả đơn đã được backend xác minh.
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Result, Spin } from 'antd';
@@ -16,6 +17,7 @@ const VnpayReturnSection = () => {
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
   const requestKey = location.search + retry;
 
+  // Gửi tham số VNPay về backend xác minh; chỉ sau đó mới điều hướng tới kết quả đúng đơn.
   useEffect(() => {
     let outdated = false;
     orderService.verifyReturn(location.search)

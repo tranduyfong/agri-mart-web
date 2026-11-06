@@ -1,3 +1,4 @@
+// Nút/chữ gửi lại OTP; tạm khóa trong thời gian đếm ngược.
 interface ResendCodeTextProps {
   secondsLeft: number; // Số giây còn phải chờ, bằng 0 thì được bấm gửi lại
   isSending: boolean; // Đang gửi lại mã

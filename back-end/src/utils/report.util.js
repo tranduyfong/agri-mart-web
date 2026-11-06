@@ -1,5 +1,7 @@
+// Các phép tính dùng chung cho báo cáo: khoảng ngày Việt Nam, ngày hoàn tất và giá vốn theo lô đã xuất.
 const { parseDate, getToday } = require('./date.util');
 
+// Đổi khoảng ngày lọc thành mốc đầu/cuối theo Việt Nam; mốc cuối dùng điều kiện nhỏ hơn.
 const getReportRange = (query) => {
     const to = query.to || getToday();
     const from = query.from || to.slice(0, 8) + '01';
@@ -10,6 +12,7 @@ const getReportRange = (query) => {
     return { from, to, start: new Date(start.getTime() - 7 * 3600000), end: new Date(last.getTime() + 17 * 3600000) };
 };
 
+// Ưu tiên lịch sử hoàn tất; đơn cũ thiếu lịch sử mới dùng mốc dự phòng.
 const completedAt = (order) => {
     const event = (order.status_history || []).filter((item) => item.status === 'COMPLETED').at(-1);
     return event?.changed_at || order.created_at;
@@ -42,6 +45,7 @@ const getAllocationCost = (allocation, item, receipts, asOf) => {
     return quantity ? amount / quantity : null;
 };
 
+// Cộng giá vốn các lô của đơn; thiếu thông tin phải báo thiếu thay vì tự coi giá vốn bằng 0.
 const getOrderCost = (order, receipts) => {
     let amount = 0,
         missing = 0;

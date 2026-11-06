@@ -1,3 +1,4 @@
+// Thẻ một lần đặt hàng, hiển thị sản phẩm/tổng tiền/trạng thái và liên kết xem chi tiết.
 import { Button, Tag } from 'antd';
 import { EnvironmentOutlined, RightOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
@@ -7,6 +8,7 @@ import { getOrderResultPath } from '../../utils/constants';
 import { formatPrice } from '../../utils/format';
 import { getFileUrl } from '../../utils/fileUrl';
 import type { CheckoutOrder } from '../../types/order';
+import LotPriceDetails from '../../components/LotPriceDetails';
 
 const OrderCard = ({ order }: { order: CheckoutOrder }) => {
   const status = ORDER_STATUSES[order.status];
@@ -49,7 +51,7 @@ const OrderCard = ({ order }: { order: CheckoutOrder }) => {
                   alt={item.name}
                 />
               ) : (
-                <span className="text-xs text-gray-400">AgriFood</span>
+                <span className="text-xs text-gray-400">Agri-Mart</span>
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -58,7 +60,7 @@ const OrderCard = ({ order }: { order: CheckoutOrder }) => {
                 {item.variant_name} · {item.quantity.toLocaleString('vi-VN')} {item.unit}
               </p>
             </div>
-            <span className="shrink-0 text-sm font-semibold">{formatPrice(item.line_total)}</span>
+            <div><LotPriceDetails parts={item.price_breakdown} unit={item.unit} /><span className="shrink-0 text-sm font-semibold">{formatPrice(item.line_total)}</span></div>
           </li>
         ))}
       </ul>

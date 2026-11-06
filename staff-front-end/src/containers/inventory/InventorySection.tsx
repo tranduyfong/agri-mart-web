@@ -1,3 +1,4 @@
+// Bảng tồn theo SKU/lô, lọc hạn sử dụng và cảnh báo hàng gần/hết hạn.
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, Button, Input, Select, Table } from 'antd';
@@ -7,7 +8,7 @@ import StatusTag from '../../components/StatusTag';
 import useData from '../../hooks/useData';
 import inventoryService from '../../services/inventoryService';
 import { tablePagination } from '../../utils/tablePagination';
-import { formatDate } from '../../utils/format';
+import { formatDate, formatPrice } from '../../utils/format';
 const InventorySection = () => {
   const [params] = useSearchParams();
   const [query, setQuery] = useState({ keyword: '', status: params.get('status') || '', pageNumber: 0, pageSize: 10 });
@@ -77,6 +78,7 @@ const InventorySection = () => {
               render: (value: number) => <span className="font-medium">{value.toLocaleString('vi-VN')}</span>,
             },
             { title: 'Hạn sử dụng', dataIndex: 'expiry_date', render: formatDate },
+            { title: 'Giá bán lô', dataIndex: 'list_price', render: formatPrice },
             { title: 'Tình trạng', dataIndex: 'status', render: (status: string) => <StatusTag status={status} /> },
           ]}
         />

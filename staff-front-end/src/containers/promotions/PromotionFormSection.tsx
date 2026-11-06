@@ -1,3 +1,4 @@
+// Tạo/sửa ưu đãi hoặc mã giảm: thời gian, giá trị, ảnh và kiểm tra danh sách SKU áp dụng.
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Select, Switch, Tag } from 'antd';
@@ -51,6 +52,7 @@ const PromotionForm = ({
   const type = Form.useWatch('discount_type', form) || 'PERCENT';
   const value = Form.useWatch('discount_value', form) || 0;
   const requiresCode = Form.useWatch('requires_code', form);
+  // Đối chiếu các mã đã nhập với danh sách sản phẩm/quy cách có thật.
   const resolveCodes = () => {
     const tokens = [
       ...new Set(
@@ -72,11 +74,13 @@ const PromotionForm = ({
     }
     return { missing, ids };
   };
+  // Tách mã theo dấu phân cách, bỏ trùng và báo những mã không tìm thấy.
   const checkCodes = () => {
     const result = resolveCodes();
     setInvalid(result.missing);
     form.setFieldValue('product_ids', [...new Set([...selectedIds, ...result.ids])]);
   };
+  // Đổi ngày và phạm vi sản phẩm/mã giảm/ảnh thành payload rồi lưu chương trình.
   const submit = async (values: Values) => {
     const resolved = resolveCodes();
     setInvalid(resolved.missing);

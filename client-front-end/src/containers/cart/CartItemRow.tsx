@@ -1,3 +1,4 @@
+// Một dòng giỏ hàng với chọn mua, ảnh/quy cách, số lượng, giá và thao tác xóa.
 import { Link } from 'react-router-dom';
 import { Checkbox, Popconfirm } from 'antd';
 import { DeleteOutlined, HeartFilled, HeartOutlined, ShoppingOutlined } from '@ant-design/icons';
@@ -9,7 +10,8 @@ import { getFileUrl } from '../../utils/fileUrl';
 import { getProductDetailPath } from '../../utils/constants';
 import { formatPrice } from '../../utils/format';
 import { getMaxQuantity, getQuantityStep, normalizeQuantity } from '../../utils/productQuantity';
-import { canSelectCartItem, getCartItemPrice } from '../../utils/shopping';
+import { canSelectCartItem, getCartItemPrice, getCartItemTotal } from '../../utils/shopping';
+import LotPriceDetails from '../../components/LotPriceDetails';
 
 interface CartItemRowProps {
   item: CartItem;
@@ -51,6 +53,7 @@ const CartItemRow = ({ item, checked, onSelect }: CartItemRowProps) => {
             {item.name}
           </Link>
           <p className="mt-1 text-xs text-gray-500">{item.variant_name}</p>
+          <LotPriceDetails parts={item.price_breakdown} unit={item.unit} />
           {!isAvailable && (
             <p className="mt-1 text-xs font-medium text-red-500">
               {item.status !== 'PUBLISHED'
@@ -64,7 +67,7 @@ const CartItemRow = ({ item, checked, onSelect }: CartItemRowProps) => {
       </div>
       <div>
         <p className="mb-1 text-xs text-gray-400 lg:hidden">Đơn giá</p>
-        <span className="font-semibold text-gray-900">{formatPrice(price)}</span>
+        <span className="font-semibold text-gray-900">{(item.price_breakdown?.length || 0) > 1 ? 'Từ ' : ''}{formatPrice(price)}</span>
         <span className="text-xs text-gray-500"> / {item.unit}</span>
         {!!item.discount_percent && (
           <p className="mt-1 text-xs text-gray-400 line-through">{formatPrice(item.list_price)}</p>
@@ -85,7 +88,7 @@ const CartItemRow = ({ item, checked, onSelect }: CartItemRowProps) => {
       </div>
       <div>
         <p className="mb-1 text-xs text-gray-400 lg:hidden">Thành tiền</p>
-        <p className="font-bold text-gray-900">{formatPrice(price * item.quantity)}</p>
+        <p className="font-bold text-gray-900">{formatPrice(getCartItemTotal(item))}</p>
       </div>
       <div className="flex justify-end gap-2 lg:flex-col">
         <button

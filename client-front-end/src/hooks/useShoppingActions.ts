@@ -1,3 +1,4 @@
+// Dùng chung luồng yêu cầu đăng nhập, sửa giỏ/yêu thích, báo lỗi và hiệu ứng khi API thành công.
 import { App } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from './useRedux';
@@ -17,6 +18,7 @@ const useShoppingActions = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Mở thông báo đăng nhập và giữ đường dẫn quay lại sau khi người dùng đăng nhập xong.
   const showLogin = () => {
     modal.confirm({
       title: 'Đăng nhập để tiếp tục',
@@ -26,12 +28,14 @@ const useShoppingActions = () => {
     });
   };
 
+  // Cho thao tác tiếp tục nếu đã đăng nhập; nếu chưa thì mở luồng yêu cầu đăng nhập.
   const requireLogin = () => {
     if (user) return true;
     showLogin();
     return false;
   };
 
+  // Gửi thao tác giỏ/yêu thích, kiểm tra phiên khi nhận kết quả rồi mới báo thành công/chạy hiệu ứng.
   const runMutation = async (action: ShoppingMutation, source: HTMLElement | null = null, imageUrl?: string | null) => {
     if (!requireLogin()) return false;
     try {

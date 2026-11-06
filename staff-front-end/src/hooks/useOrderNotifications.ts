@@ -1,3 +1,4 @@
+// Nhận sự kiện đơn qua Socket và tải số đơn chờ duyệt; có kiểm tra định kỳ để bù thông báo bị lỡ.
 import { useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { io } from 'socket.io-client';
@@ -7,6 +8,7 @@ import apiClient from '../services/apiClient';
 const useOrderNotifications = (token: string | null, enabled: boolean) => {
   const [state, setState] = useState({ token, pendingCount: 0, ordersRevision: 0, ordersConnected: false });
 
+  // Mở Socket theo quyền đơn hàng; tải số chờ duyệt và dọn timer/listener khi token hoặc quyền thay đổi.
   useEffect(() => {
     if (!token || !enabled) return;
     let disposed = false;
@@ -14,6 +16,7 @@ const useOrderNotifications = (token: string | null, enabled: boolean) => {
     let queued = false;
     const url = new URL(apiClient.defaults.baseURL!, window.location.origin);
     const socket = io(url.origin, { auth: { token }, autoConnect: false });
+    // Tải summary mới; nếu lượt trước chưa xong thì ghi nhận cần tải thêm thay vì gọi chồng request.
     const refresh = async () => {
       if (loading) {
         queued = true;

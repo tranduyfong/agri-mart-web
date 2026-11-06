@@ -1,3 +1,4 @@
+// Các quy tắc Ant Design Form dùng chung: bắt buộc, email, số điện thoại và xác nhận mật khẩu.
 import type { Rule } from 'antd/es/form';
 
 // Các quy tắc kiểm tra dữ liệu nhập dùng chung cho các form

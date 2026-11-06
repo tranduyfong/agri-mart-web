@@ -1,3 +1,4 @@
+// Form đăng nhập khách hàng: xử lý tài khoản chưa xác minh, lưu phiên và quay lại trang người dùng định mở.
 import { useState } from 'react';
 import { App, Form } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';

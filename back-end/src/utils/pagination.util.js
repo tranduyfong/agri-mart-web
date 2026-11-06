@@ -1,3 +1,4 @@
+// Chuẩn hóa số trang/kích thước trang và tính metadata phân trang cho API.
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100; // Giới hạn để tránh client gọi pageSize quá lớn làm nặng server
 

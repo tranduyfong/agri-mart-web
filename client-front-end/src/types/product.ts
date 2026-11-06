@@ -1,4 +1,6 @@
+// Hợp đồng thông tin sản phẩm, quy cách, ảnh và các bộ lọc phục vụ màn hình sản phẩm.
 import type { PaginatedResponse } from './api';
+import type { SaleLot } from '../utils/lotPricing';
 
 // Kiểu sắp xếp danh sách sản phẩm mà back-end hỗ trợ
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'best_selling' | 'trending';
@@ -47,6 +49,7 @@ export type ProductCardItem = Pick<
 
 // Quy cách trong chi tiết sản phẩm (VD: hộp 500g, bán theo kg với bước nhảy 0.5)
 export interface ProductVariant {
+  sale_lots?: SaleLot[];
   id: string;
   sku: string;
   name: string;

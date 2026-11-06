@@ -42,6 +42,8 @@ Mục **Duyệt sản phẩm** mặc định lọc yêu cầu chờ duyệt, t�
 
 Khoảng ngày tính theo Việt Nam, tối đa 367 ngày. Doanh thu lấy tiền cuối cùng của đơn hoàn tất PAID/REFUNDED, gồm phí giao sau ưu đãi; phần hoàn tiền trình bày riêng. Lợi nhuận gộp = doanh thu − hoàn tiền − giá vốn, chưa trừ vận hành/giao hàng.
 
+Mục **Nhà cung cấp** (`/suppliers`) hỗ trợ thêm, xem và sửa mã/tên/số điện thoại. Chi tiết có số phiếu đã ghi nhận, tổng giá trị nhập, tổng lượng tách theo đơn vị và bảng SKU đã nhập. Chọn nhà cung cấp này khi nhập Excel ở phía nhân viên; thống kê chỉ tăng sau khi phiếu được duyệt. Giá trị nhập chưa thể hiện công nợ hay các khoản đã thực thanh toán.
+
 Ngày hoàn tất lấy từ lịch sử, đơn cũ thiếu lịch sử dùng ngày tạo và báo rõ. Giá vốn theo đúng lô và các phiếu nhập đã có lúc xuất. Đơn mới lưu unit_cost trong stock_allocations; nhập thêm hàng không đổi giá vốn đã ghi. Dữ liệu thiếu không được suy đoán, hiển thị **Chưa đủ dữ liệu**.
 
 Nhập/bán lọc theo kỳ; tồn sổ và lượng phân bổ là số hiện tại. Chưa có sổ điều chỉnh đầy đủ nên không dựng tồn đầu/cuối quá khứ. Số lượng tách theo SKU/đơn vị, không cộng kg với gói/bó/chai. CSV UTF-8 có BOM, xuất toàn bộ trang của bộ lọc và tránh công thức trong ô.

@@ -1,3 +1,4 @@
+// Thông tin nhà cung cấp được tham chiếu từ phiếu nhập hàng.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

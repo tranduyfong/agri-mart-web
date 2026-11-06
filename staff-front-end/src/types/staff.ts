@@ -1,3 +1,4 @@
+// Các kiểu dữ liệu dùng chung cho màn hình nhân viên: phiên/quyền, kho, đơn, khuyến mãi, bản tin và chat.
 export interface StaffUser {
   id: string;
   full_name: string;
@@ -41,6 +42,7 @@ export interface StaffProduct {
   thumbnail_url: string | null;
 }
 export interface InventoryLot {
+  list_price: number;
   id: string;
   product_id: string;
   name: string;
@@ -56,6 +58,8 @@ export interface InventoryLot {
 }
 export type ImportRow = Record<string, string | number | null>;
 export interface CheckedRow {
+  data: ImportRow;
+  list_price: number | null;
   row_number: number;
   sku: string;
   name: string;
@@ -63,6 +67,7 @@ export interface CheckedRow {
   quantity: number;
   unit_cost: number;
   is_new: boolean;
+  image_url: string | null;
   errors: string[];
 }
 export interface ImportPreview {
@@ -110,6 +115,7 @@ export interface OrderDetail extends StaffOrder {
     price: number;
     quantity: number;
     line_total: number;
+    stock_allocations?: { batch_code: string; expiry_date: string; quantity: number; price?: number }[];
   }[];
   status_history: { status: string; staff_name: string; changed_at: string; note: string }[];
 }

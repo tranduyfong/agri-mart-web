@@ -1,3 +1,4 @@
+// Danh sách đơn của khách với tìm kiếm, lọc trạng thái, phân trang và tự tải lại để theo dõi tiến độ.
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Alert, Button, Empty, Input, Pagination, Result, Skeleton } from 'antd';
@@ -32,6 +33,7 @@ const OrderTrackingSection = () => {
   const response = result?.key === requestKey ? result.response : null;
   const errorMessage = error?.key === requestKey ? error.message : '';
 
+  // Tải các đơn theo tài khoản và bộ lọc hiện tại, kèm cơ chế tự làm mới để theo dõi tiến độ.
   useEffect(() => {
     if (!sessionToken) return;
     const controller = new AbortController();

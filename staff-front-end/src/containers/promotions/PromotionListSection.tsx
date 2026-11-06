@@ -1,6 +1,7 @@
+// Danh sách chương trình khuyến mãi với tìm kiếm, trạng thái, sửa và kết thúc chương trình.
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, App, Button, Input, Select, Table } from 'antd';
+import { Alert, App, Button, Input, Select, Table, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import PageHeader from '../../components/PageHeader';
 import Panel from '../../components/Panel';
@@ -26,6 +27,7 @@ const PromotionListSection = ({
     return promotionService.getPromotions({ ...query, scope });
   }, [query, scope, revision]);
   const { data, loading, error, reload } = useData(load);
+  // Xác nhận kết thúc chương trình và làm mới danh sách khi API thành công.
   const end = (id: string) =>
     modal.confirm({
       title: 'Kết thúc chương trình này?',
@@ -94,7 +96,7 @@ const PromotionListSection = ({
                 <div className="font-medium">
                   {item.name}
                   <p className="mt-1 text-xs font-normal text-muted">
-                    {item.code} ·{' '}
+                    <Typography.Text copyable={{ text: item.code, tooltips: ['Sao chép mã', 'Đã sao chép'] }}>{item.code}</Typography.Text> ·{' '}
                     {item.requires_code || scope === 'SHIPPING' || item.discount_type === 'AMOUNT'
                       ? 'Nhập mã khi thanh toán'
                       : 'Giảm tự động'}

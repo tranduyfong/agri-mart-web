@@ -10,6 +10,8 @@ Chạy backend cùng `npm run dev` trong project này. Địa chỉ API lấy t�
 
 Khi backend bật Gemini, AI tự phản hồi và có thẻ sản phẩm kèm **Đặt sản phẩm này** hoặc **Đặt cả nhóm**. Nút đưa tới checkout, tự lấy địa chỉ mặc định và kiểm tra lại giá/kho, không thêm sản phẩm vào giỏ. Có nút **Gặp nhân viên**; AI dừng sau khi chuyển tiếp hoặc nhân viên tiếp nhận. Cấu hình API key chỉ nằm ở backend.
 
+Khuyến mãi và Flash sale trên trang chủ hiển thị theo từng hàng phủ chiều rộng. Chat giữ lời giải thích của AI, nhớ ngân sách/số người, kiểm tra giá gợi ý trước khi hiển thị và có **Tiếp tục với AI** khi khách muốn hủy chờ nhân viên. Tư vấn sức khỏe giới hạn ở lựa chọn thực phẩm tham khảo, hỏi thêm giới hạn ăn kiêng khi cần; không dùng để chẩn đoán hoặc thay đổi điều trị.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

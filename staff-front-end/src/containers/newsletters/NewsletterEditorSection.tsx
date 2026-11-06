@@ -1,3 +1,4 @@
+// Soạn nội dung Markdown, lưu nháp, xem trước và xác nhận gửi bản tin email.
 import { useCallback, useState } from 'react';
 import { Alert, App, Button, Form, Input, Modal, Space, Table } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -29,6 +30,7 @@ const NewsletterEditor = ({
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(false);
   const readOnly = !!newsletter && newsletter.status !== 'DRAFT';
+  // Lưu tiêu đề và nội dung Markdown làm bản nháp trước khi gửi.
   const save = async (values: Values, send = false) => {
     setSaving(true);
     try {
@@ -44,6 +46,7 @@ const NewsletterEditor = ({
       setSaving(false);
     }
   };
+  // Yêu cầu xác nhận hành động gửi, sau đó gọi API chạy bản tin.
   const confirmSend = async () => {
     try {
       const values = await form.validateFields();

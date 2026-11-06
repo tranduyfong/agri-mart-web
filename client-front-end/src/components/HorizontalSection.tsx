@@ -1,3 +1,4 @@
+// Hàng cuộn ngang có nút trái/phải ở hai đầu; theo dõi vị trí cuộn để bật/tắt nút phù hợp.
 import { Children, useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button } from 'antd';
@@ -20,6 +21,7 @@ const HorizontalSection = ({ title, children, itemClassName, linkTo, extra }: Ho
   const [canScroll, setCanScroll] = useState({ left: false, right: false });
   const items = Children.toArray(children);
 
+  // Theo dõi cuộn/thay đổi kích thước để biết đầu/cuối hàng và trạng thái hai nút mũi tên.
   useEffect(() => {
     const viewport = viewportRef.current;
     const track = trackRef.current;

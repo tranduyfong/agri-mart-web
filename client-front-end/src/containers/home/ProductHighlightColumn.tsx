@@ -1,3 +1,4 @@
+// Một cột sản phẩm gợi ý trên trang chủ theo nhóm nội dung được truyền vào.
 import ProductCard from '../../components/ProductCard';
 import ProductCardSkeleton from '../../components/ProductCardSkeleton';
 import useProducts from '../../hooks/useProducts';

@@ -1,3 +1,4 @@
+// Khu sản phẩm nổi bật/bán chạy, có điều kiện chọn dữ liệu và hàng thẻ cuộn ngang.
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Empty } from 'antd';

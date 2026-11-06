@@ -1,3 +1,4 @@
+// Báo hội thoại thay đổi qua Socket sau khi lưu; nội dung tin vẫn được tải qua API có xác thực.
 const socketConfig = require('../configs/socket.config');
 
 // Chỉ báo sau khi DB đã lưu; nội dung được đọc lại qua API có xác thực.

@@ -1,3 +1,4 @@
+// Đọc giỏ từ Redux, giữ các dòng được chọn và tính phần tóm tắt trước khi chuyển checkout.
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Checkbox, Empty } from 'antd';
@@ -7,7 +8,7 @@ import ShoppingSection from '../shopping/ShoppingSection';
 import CartItemRow from './CartItemRow';
 import { ROUTES } from '../../utils/constants';
 import { formatPrice } from '../../utils/format';
-import { canSelectCartItem, getCartItemPrice } from '../../utils/shopping';
+import { canSelectCartItem, getCartItemTotal } from '../../utils/shopping';
 
 const CartSection = () => {
   const navigate = useNavigate();
@@ -16,9 +17,10 @@ const CartSection = () => {
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
   const availableItems = cart.filter(canSelectCartItem);
   const selectedItems = availableItems.filter((item) => !excludedIds.includes(item.id));
-  const total = selectedItems.reduce((sum, item) => sum + getCartItemPrice(item) * item.quantity, 0);
+  const total = selectedItems.reduce((sum, item) => sum + getCartItemTotal(item), 0);
   const allSelected = availableItems.length > 0 && selectedItems.length === availableItems.length;
 
+  // Thêm hoặc bỏ ID dòng hàng trong danh sách được chọn để checkout.
   const selectItem = (id: string, checked: boolean) => {
     setExcludedIds((ids) => checked ? ids.filter((item) => item !== id) : [...ids, id]);
   };

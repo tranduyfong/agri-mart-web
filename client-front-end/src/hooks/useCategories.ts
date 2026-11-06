@@ -1,3 +1,4 @@
+// Đọc danh mục từ Redux và chỉ khởi chạy tải khi chưa có kết quả.
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from './useRedux';
 import { fetchCategories } from '../store/slices/categorySlice';
@@ -8,6 +9,7 @@ const useCategories = () => {
   const dispatch = useAppDispatch();
   const { items, status } = useAppSelector((state) => state.category);
 
+  // Chỉ dispatch tải danh mục khi Redux chưa tải, tránh mỗi component tự gọi API trùng.
   useEffect(() => {
     if (status === 'idle') {
       dispatch(fetchCategories());

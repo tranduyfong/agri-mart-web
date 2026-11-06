@@ -1,3 +1,4 @@
+// Nút hành động chính dùng chung màu sắc, trạng thái đang xử lý và tùy chọn kích thước.
 import { Button } from 'antd';
 import type { ReactNode } from 'react';
 

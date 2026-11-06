@@ -1,3 +1,4 @@
+// Theme/token Ant Design dùng chung; đổi ở đây để các nút, form và màu sắc thống nhất trong ứng dụng.
 import type { ThemeConfig } from 'antd';
 
 // Cấu hình giao diện cho các component của Ant Design (màu chủ đạo, bo góc, font...)

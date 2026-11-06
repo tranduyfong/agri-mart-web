@@ -1,3 +1,4 @@
+// Điều hướng giữa thông tin cá nhân, sổ địa chỉ và đổi mật khẩu.
 import { Avatar } from 'antd';
 import { NavLink } from 'react-router-dom';
 import { EnvironmentOutlined, LockOutlined, RightOutlined, TruckOutlined, UserOutlined } from '@ant-design/icons';

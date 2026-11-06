@@ -1,3 +1,5 @@
+// Các lời gọi API cho đăng nhập/đăng ký/OTP; tách giao tiếp HTTP khỏi component. response.data là thân response
+// Axios, trường data bên trong là dữ liệu nghiệp vụ.
 import apiClient from './apiClient';
 import type { ApiResponse } from '../types/api';
 import type { AuthUser, LoginResponseData, RegisterRequest } from '../types/auth';

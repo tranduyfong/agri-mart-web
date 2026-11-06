@@ -1,3 +1,4 @@
+// Tạo nội dung HTML email OTP/xác minh; cấu hình gửi thực tế nằm trong mailer.config.js.
 const getOtpEmailTemplate = (otpCode) => {
     return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">

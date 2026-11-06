@@ -1,3 +1,4 @@
+// Bố cục nhân viên với sidebar desktop, drawer mobile và thông báo đơn chờ xác nhận.
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Badge, Button, Drawer, Tooltip } from 'antd';
@@ -10,12 +11,14 @@ const StaffLayout = () => {
   const { pathname } = useLocation();
   const { user, hasPermission, pendingCount } = useAuth();
   const [open, setOpen] = useState(false);
+  // Đổi trang thì đưa cuộn lên đầu và cập nhật các phần tử AOS.
   useEffect(() => {
     window.scrollTo({ top: 0 });
     const frame = requestAnimationFrame(() => AOS.refreshHard());
     return () => cancelAnimationFrame(frame);
   }, [pathname]);
   const section = NAV_ITEMS.find((item) => item.path !== '/' && pathname.startsWith(item.path)) || NAV_ITEMS[0];
+  // Đặt tiêu đề tab trình duyệt theo mục nhân viên đang mở.
   useEffect(() => {
     document.title = section.label + ' · Agri-Mart';
   }, [section.label]);

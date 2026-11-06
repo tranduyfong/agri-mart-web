@@ -1,5 +1,7 @@
+/* CSS toàn ứng dụng: thứ tự layer để Tailwind phối hợp Ant Design, màu/font và các chỉnh sửa hiển thị dùng chung. */
 @layer theme, base, antd, components, utilities;
 @import 'tailwindcss';
+/* Các token này tạo class Tailwind như bg-primary/text-muted và font tiếng Việt dùng chung. */
 @theme {
   --color-primary: #287a32;
   --color-primary-dark: #20652a;

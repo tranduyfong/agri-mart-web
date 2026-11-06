@@ -1,3 +1,4 @@
+// Nhóm tiêu đề và liên kết ở chân trang để các cột dùng cùng cách trình bày.
 import { Link } from 'react-router-dom';
 
 interface FooterLink {

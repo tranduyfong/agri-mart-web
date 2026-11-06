@@ -1,3 +1,4 @@
+// Liên kết chuyển giữa các màn hình đăng nhập và đăng ký.
 import { Link } from 'react-router-dom';
 
 interface AuthSwitchTextProps {

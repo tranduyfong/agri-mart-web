@@ -1,3 +1,4 @@
+// Danh sách và chi tiết đề nghị thêm/sửa/nhập sản phẩm; vai trò quyết định được xem hay duyệt.
 import { useCallback, useState } from 'react';
 import { Alert, App, Button, Drawer, Input, Select, Table, Tag } from 'antd';
 import PageHeader from '../../components/PageHeader';
@@ -17,6 +18,7 @@ const Detail = ({ id, canReview, onDone }: { id: string; canReview: boolean; onD
   const [busy, setBusy] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const { message } = App.useApp();
+  // Gửi quyết định duyệt/từ chối và ghi chú; dữ liệu thật chỉ đổi khi backend áp dụng thành công.
   const review = async (status: Exclude<ChangeStatus, 'PENDING'>) => {
     if (busy) return;
     if (status === 'REJECTED' && !note.trim()) {

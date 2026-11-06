@@ -1,3 +1,4 @@
+// Chặn route khi chưa đăng nhập hoặc thiếu vai trò/quyền; backend vẫn kiểm tra lại quyền ở API.
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Result, Spin } from 'antd';

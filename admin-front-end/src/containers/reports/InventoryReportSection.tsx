@@ -1,3 +1,4 @@
+// Báo cáo nhập/bán/tồn theo SKU và đơn vị; có bộ lọc, cảnh báo dữ liệu và xuất CSV.
 import { useCallback, useState } from 'react';
 import { Alert, App, Button, Input, Select, Table } from 'antd';
 import dayjs from 'dayjs';
@@ -13,6 +14,7 @@ import { tablePagination } from '../../utils/tablePagination';
 import { formatPrice } from '../../utils/format';
 import { getErrorMessage } from '../../utils/errorMessage';
 import { downloadCsv } from '../../utils/exportCsv';
+// Biểu diễn số hoặc giá trị chưa có dữ liệu mà không biến thiếu dữ liệu thành số 0.
 const number = (value: number) => value.toLocaleString('vi-VN');
 const InventoryReportSection = () => {
   const { message } = App.useApp();
@@ -28,6 +30,7 @@ const InventoryReportSection = () => {
   const { data: lookups } = useData(adminService.getLookups);
   const load = useCallback(() => reportService.getInventory(query), [query]);
   const { data, error, reload } = useData(load);
+  // Tải dữ liệu báo cáo cần xuất và đổi thành CSV theo SKU/đơn vị.
   const exportReport = async () => {
     setExporting(true);
     try {

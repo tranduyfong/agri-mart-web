@@ -1,9 +1,11 @@
+// Quản trị viên tra cứu/sửa tài khoản, tạo nhân viên, khóa phiên và cấp quyền trực tiếp trên User.
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/user');
 const { STAFF_PERMISSIONS } = require('../utils/permissions.util');
 const { normalizeSearch } = require('../utils/string.util');
 
+// Lọc các trường được phép trả cho admin và chuyển _id thành id dễ dùng ở frontend.
 const userDto = (user) => ({
     id: user._id.toString(),
     full_name: user.full_name,
@@ -15,6 +17,7 @@ const userDto = (user) => ({
     updated_at: user.updated_at
 });
 
+// Áp dụng tìm kiếm/vai trò/trạng thái và phân trang danh sách tài khoản.
 const getAccounts = async (filters, pagination) => {
     const query = {};
     if (filters.role) {
@@ -33,6 +36,7 @@ const getAccounts = async (filters, pagination) => {
     return { items: matched.slice(pagination.offset, pagination.offset + pagination.pageSize).map(userDto), totalElements: matched.length };
 };
 
+// Lấy chi tiết một tài khoản theo ID đã kiểm tra.
 const getAccount = async (id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const user = await User.findById(id).select('full_name email phone role status permissions updated_at').lean();
@@ -40,6 +44,7 @@ const getAccount = async (id) => {
     return userDto(user);
 };
 
+// Chỉ chấp nhận những mã quyền có trong danh sách quyền của hệ thống.
 const validateAssignments = async (data) => {
     if (
         !Array.isArray(data.permissions) ||
@@ -49,6 +54,7 @@ const validateAssignments = async (data) => {
         throw new Error('INVALID_DATA');
 };
 
+// Tạo nhân viên với mật khẩu đã băm; payload không được tự nâng vai trò lên ADMIN.
 const createStaff = async (data) => {
     if (
         typeof data.full_name !== 'string' ||
@@ -81,6 +87,7 @@ const createStaff = async (data) => {
     return getAccount(user._id.toString());
 };
 
+// Sửa thông tin/email, kiểm tra trùng và thu hồi phiên khi thay đổi thông tin yêu cầu đăng nhập lại.
 const updateAccount = async (id, data) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const user = await User.findById(id).select('+token_version');
@@ -114,6 +121,7 @@ const updateAccount = async (id, data) => {
     return getAccount(id);
 };
 
+// Khóa/mở khóa có đối chiếu trạng thái hiện tại; khóa sẽ làm phiên cũ mất hiệu lực.
 const setAccountLock = async (id, data) => {
     if (!['LOCK', 'UNLOCK'].includes(data.action)) throw new Error('INVALID_DATA');
     const account = await getAccount(id);
@@ -128,6 +136,7 @@ const setAccountLock = async (id, data) => {
     return getAccount(id);
 };
 
+// Lưu quyền cho nhân viên và kiểm tra updated_at để tránh ghi đè chỉnh sửa của người khác.
 const savePermissions = async (id, data) => {
     await validateAssignments(data);
     const account = await getAccount(id);

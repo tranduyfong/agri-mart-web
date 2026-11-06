@@ -1,3 +1,4 @@
+// Khai báo dữ liệu và hành động chia sẻ của phiên đăng nhập; AuthProvider là nơi nạp và cung cấp giá trị thật.
 import { createContext } from 'react';
 import type { StaffUser } from '../types/staff';
 

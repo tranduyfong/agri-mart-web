@@ -1,3 +1,4 @@
+// Page được router mở cho màn hình này; phần dữ liệu và giao diện chính được giao cho LoginForm.
 import Logo from '../components/Logo';
 import LoginForm from '../containers/auth/LoginForm';
 const LoginPage = () => (

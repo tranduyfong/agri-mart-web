@@ -1,3 +1,4 @@
+// Bộ chọn khoảng ngày dùng chung cho báo cáo; chuyển giá trị thành ngày mà API hiểu.
 import { DatePicker } from 'antd';
 import dayjs from 'dayjs';
 const ReportFilters = ({

@@ -1,3 +1,5 @@
+// Nhận request của nhóm đặt hàng và VNPay, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống nhất
+// dữ liệu trả cho frontend.
 const mongoose = require('mongoose');
 const orderService = require('../services/order.services');
 const vnpayInstance = require('../configs/vnpay.config');
@@ -13,8 +15,10 @@ const COUPON_ERRORS = {
     COUPON_NOT_APPLICABLE: 'Mã giảm giá không áp dụng cho sản phẩm hoặc phí giao hàng của đơn này.'
 };
 
+// Chỉ nhận mã chuỗi có độ dài/ký tự cho phép trước khi tra ưu đãi.
 const isValidCouponCode = (code) => code === undefined || (typeof code === 'string' && /^[a-zA-Z0-9_-]{0,80}$/.test(code.trim()));
 
+// Phân biệt mua từ giỏ với mua ngay; giới hạn số dòng và chặn ID quy cách bị lặp.
 const isValidSelection = (data) => {
     if (data.buy_now !== undefined) {
         const selections = Array.isArray(data.buy_now) ? data.buy_now : [data.buy_now];
@@ -34,6 +38,7 @@ const isValidSelection = (data) => {
     );
 };
 
+// Kiểm tra bộ lọc rồi lấy các lần đặt của chính tài khoản đang đăng nhập.
 const getMyOrders = async (req, res) => {
     try {
         const status = req.query.status || '';
@@ -49,6 +54,7 @@ const getMyOrders = async (req, res) => {
     }
 };
 
+// Kiểm tra lựa chọn/khóa/mã giảm, rồi xin service tính lại số tiền; đây chưa phải thao tác đặt đơn.
 const getPreview = async (req, res) => {
     try {
         const { cart_item_ids, checkout_key, coupon_code, buy_now } = req.body || {};
@@ -71,6 +77,7 @@ const getPreview = async (req, res) => {
     }
 };
 
+// Chỉ nhận các trường giao hàng/thanh toán cần thiết và chuyển yêu cầu tạo đơn cho service.
 const checkout = async (req, res) => {
     try {
         const data = req.body || {};
@@ -143,6 +150,7 @@ const checkout = async (req, res) => {
     }
 };
 
+// Lấy kết quả một lần đặt có kiểm tra user sở hữu đơn.
 const getDetail = async (req, res) => {
     try {
         const order = await orderService.getCheckout(req.user.userId, req.params.code);
@@ -153,6 +161,7 @@ const getDetail = async (req, res) => {
     }
 };
 
+// Xin URL VNPay sau khi kiểm tra quyền sở hữu và điều kiện đơn được thanh toán.
 const getPaymentUrl = async (req, res) => {
     try {
         const order = await orderService.getCheckout(req.user.userId, req.params.code);
@@ -169,6 +178,7 @@ const getPaymentUrl = async (req, res) => {
     }
 };
 
+// Yêu cầu đối soát trạng thái giao dịch qua backend rồi trả dữ liệu đơn mới.
 const checkPayment = async (req, res) => {
     try {
         return successResponse(res, await orderService.checkPayment(req.user.userId, req.params.code));
@@ -178,6 +188,7 @@ const checkPayment = async (req, res) => {
     }
 };
 
+// Xử lý tham số trình duyệt được VNPay đưa về; backend xác minh trước khi trả mã đơn cho frontend.
 const vnpayReturn = async (req, res) => {
     try {
         if (
@@ -201,6 +212,7 @@ const vnpayReturn = async (req, res) => {
     }
 };
 
+// Nhận callback trực tiếp từ VNPay và trả mã phản hồi mà cổng thanh toán yêu cầu.
 const vnpayIpn = async (req, res) => {
     try {
         if (

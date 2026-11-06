@@ -1,3 +1,4 @@
+// Danh sách banner có tìm kiếm, trạng thái lịch chạy và liên kết thêm/sửa.
 import { useCallback, useState } from 'react';
 import { Button, Image, Input, Space, Table } from 'antd';
 import { Link } from 'react-router-dom';

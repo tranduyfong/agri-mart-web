@@ -1,3 +1,4 @@
+// Lưu email đăng ký bản tin và token hủy đăng ký; tách khỏi tài khoản mua hàng.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

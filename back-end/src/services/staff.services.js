@@ -1,3 +1,4 @@
+// Cung cấp phiên làm việc, dữ liệu dropdown và các chỉ số công việc hôm nay cho nhân viên.
 const Product = require('../models/product');
 const Category = require('../models/category');
 const Supplier = require('../models/supplier');
@@ -5,9 +6,12 @@ const Order = require('../models/order');
 const ChatRoom = require('../models/chatRoom');
 const staffOrderService = require('./staffOrder.services');
 const inventoryService = require('./inventory.services');
+const { getVariantPrice } = require('../utils/productStock.util');
 
+// ADMIN có quyền quản lý; STAFF cần mã quyền tương ứng trong User.permissions.
 const hasPermission = (user, permission) => user.role === 'ADMIN' || user.permissions.includes(permission);
 
+// Đọc phiên làm việc mới nhất và chỉ cho tài khoản quản lý đang hoạt động truy cập.
 const getSession = (staff) => ({
     user: {
         id: staff.user._id.toString(),
@@ -18,6 +22,7 @@ const getSession = (staff) => ({
     }
 });
 
+// Trả danh mục, nhà cung cấp và dữ liệu cần cho các ô chọn trong form nhân viên.
 const getLookups = async (user) => {
     const [categories, suppliers, products] = await Promise.all([
         Category.find().sort({ name: 1 }).lean(),
@@ -31,11 +36,12 @@ const getLookups = async (user) => {
             id: item._id.toString(),
             code: item.code,
             name: item.name,
-            variants: item.variants.map((variant) => ({ sku: variant.sku, list_price: variant.list_price, unit: variant.unit }))
+            variants: item.variants.map((variant) => ({ sku: variant.sku, list_price: getVariantPrice(variant), unit: variant.unit }))
         }))
     };
 };
 
+// Tổng hợp đơn cần xử lý, lô sắp hết hạn và hội thoại để ưu tiên công việc.
 const getDashboard = async (staff) => {
     const user = staff.user;
     const [pending, preparing, expiring, support, missingImages, orders] = await Promise.all([

@@ -1,3 +1,4 @@
+// Quản lý đăng ký nhận tin, bản nháp và quá trình gửi email; ghi lại kết quả để tránh gửi lặp.
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const MarkdownIt = require('markdown-it');
@@ -6,6 +7,7 @@ const Subscriber = require('../models/subscriber');
 const transporter = require('../configs/mailer.config');
 const markdown = new MarkdownIt({ html: false, breaks: true });
 
+// Đăng ký hoặc bật lại email nhận bản tin và chuẩn bị token hủy đăng ký.
 const subscribe = async (email) => {
     if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
         throw new Error('INVALID_DATA');
@@ -19,12 +21,14 @@ const subscribe = async (email) => {
     );
 };
 
+// Dùng token trong email để tắt nhận tin mà không cần người dùng đăng nhập.
 const unsubscribe = async (token) => {
     if (!/^[a-f0-9]{64}$/.test(token)) throw new Error('RESOURCE_NOT_FOUND');
     const result = await Subscriber.findOneAndUpdate({ unsubscribe_token: token }, { $set: { is_active: false } });
     if (!result) throw new Error('RESOURCE_NOT_FOUND');
 };
 
+// Lấy danh sách bản tin và thống kê phục vụ màn hình quản lý.
 const getNewsletters = async (pagination) => {
     const [items, totalElements, active, inactive] = await Promise.all([
         Newsletter.find({}).sort({ created_at: -1 }).skip(pagination.offset).limit(pagination.pageSize).lean(),
@@ -48,6 +52,7 @@ const getNewsletters = async (pagination) => {
     };
 };
 
+// Đọc bản nháp/nội dung cùng kết quả gửi từng người nhận.
 const getNewsletter = async (id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const item = await Newsletter.findOne({ _id: id }).lean();
@@ -55,6 +60,7 @@ const getNewsletter = async (id) => {
     return { ...item, id: item._id.toString(), subscriber_count: await Subscriber.countDocuments({ is_active: true }) };
 };
 
+// Lưu bản nháp sau khi kiểm tra tiêu đề/nội dung; không sửa bản đang được gửi.
 const saveNewsletter = async (userId, id, data) => {
     if (
         typeof data.subject !== 'string' ||
@@ -76,6 +82,7 @@ const saveNewsletter = async (userId, id, data) => {
     return { id: (await Newsletter.create({ ...values, created_by: userId }))._id.toString() };
 };
 
+// Gửi lần lượt các email cần gửi, lưu thành công/thất bại và cập nhật tiến độ.
 const deliverNewsletter = async (id) => {
     const item = await Newsletter.findById(id);
     try {
@@ -119,6 +126,7 @@ const deliverNewsletter = async (id) => {
     }
 };
 
+// Khóa trạng thái gửi để bấm lặp không khởi chạy cùng bản tin hai lần.
 const sendNewsletter = async (id) => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) throw new Error('MAIL_NOT_CONFIGURED');
     const subscribers = await Subscriber.find({ is_active: true }).select('email');
@@ -138,6 +146,7 @@ const sendNewsletter = async (id) => {
     return { id, status: 'SENDING', recipient_count: subscribers.length };
 };
 
+// Khôi phục trạng thái bản tin bị gián đoạn để hệ thống không coi nó đang gửi mãi.
 const recoverSending = async () => {
     await Newsletter.updateMany({ status: 'SENDING' }, { $set: { status: 'PARTIAL', sent_at: new Date() } });
 };

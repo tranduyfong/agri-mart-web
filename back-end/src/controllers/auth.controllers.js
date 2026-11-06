@@ -1,6 +1,9 @@
+// Nhận request của nhóm đăng ký/đăng nhập và OTP, kiểm tra đầu vào và gọi service; successResponse/errorResponse
+// thống nhất dữ liệu trả cho frontend.
 const authService = require('../services/auth.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+// Nhận thông tin đăng ký, kiểm tra đầu vào rồi tạo tài khoản chờ xác minh.
 const register = async (req, res) => {
     try {
         const { full_name, email, password, phone } = req.body || {};
@@ -30,6 +33,7 @@ const register = async (req, res) => {
     }
 };
 
+// Nhận email/OTP và trả kết quả kích hoạt tài khoản từ service.
 const verifyEmail = async (req, res) => {
     try {
         const { email, otp } = req.body || {};
@@ -59,6 +63,7 @@ const verifyEmail = async (req, res) => {
     }
 };
 
+// Nhận email đang xác minh và yêu cầu phát mã mới.
 const resendVerifyEmail = async (req, res) => {
     try {
         const { email } = req.body || {};
@@ -84,6 +89,7 @@ const resendVerifyEmail = async (req, res) => {
     }
 };
 
+// Kiểm tra thông tin đăng nhập và trả hồ sơ/token khi backend xác thực thành công.
 const login = async (req, res) => {
     try {
         const { email, password } = req.body || {};
@@ -113,6 +119,7 @@ const login = async (req, res) => {
     }
 };
 
+// Nhận email để yêu cầu gửi OTP khôi phục mật khẩu.
 const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body || {};
@@ -137,6 +144,7 @@ const forgotPassword = async (req, res) => {
     }
 };
 
+// Kiểm tra OTP quên mật khẩu để giao diện mở bước nhập mật khẩu mới.
 const verifyOtpForgotPassword = async (req, res) => {
     try {
         const { email, otp } = req.body || {};
@@ -170,6 +178,7 @@ const verifyOtpForgotPassword = async (req, res) => {
     }
 };
 
+// Kiểm tra mật khẩu mới và dùng email/OTP xác minh lại trước khi đổi.
 const resetPassword = async (req, res) => {
     try {
         const { email, otp, newPassword } = req.body || {};

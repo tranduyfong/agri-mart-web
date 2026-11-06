@@ -1,3 +1,4 @@
+// Lưu ảnh, liên kết và lịch hiển thị cho carousel trang chủ hoặc popup quảng cáo.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

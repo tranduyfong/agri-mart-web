@@ -1,3 +1,4 @@
+// Thanh điều hướng có tìm/đến trang mua hàng, giỏ, yêu thích, theo dõi đơn và menu tài khoản; có menu mobile.
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { App, Button, Drawer, Dropdown, Menu } from 'antd';

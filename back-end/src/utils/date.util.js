@@ -3,6 +3,7 @@ const getToday = () => {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 };
 
+// Đọc ngày YYYY-MM-DD theo quy ước của hệ thống và loại ngày không hợp lệ.
 const parseDate = (value) => {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
 
@@ -18,6 +19,7 @@ const formatVnpayDate = (value = new Date()) => {
     return Number(date.toISOString().slice(0, 19).replace(/\D/g, ''));
 };
 
+// Đọc chuỗi thời gian VNPay trả về thành Date để lưu và đối chiếu.
 const parseVnpayDate = (value) => {
     const text = String(value);
     if (!/^\d{14}$/.test(text)) throw new Error('INVALID_PAYMENT_DATE');

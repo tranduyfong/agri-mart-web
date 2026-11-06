@@ -1,7 +1,10 @@
+// Nhận request của nhóm sản phẩm yêu thích, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống nhất
+// dữ liệu trả cho frontend.
 const mongoose = require('mongoose');
 const wishlistService = require('../services/wishlist.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+// Trả sản phẩm yêu thích của tài khoản trong JWT.
 const getWishlist = async (req, res) => {
     try {
         const products = await wishlistService.getWishlist(req.user.userId);
@@ -11,6 +14,7 @@ const getWishlist = async (req, res) => {
     }
 };
 
+// Kiểm tra ID và thêm sản phẩm vào yêu thích của người đăng nhập.
 const addWishlistItem = async (req, res) => {
     try {
         if (!mongoose.isObjectIdOrHexString(req.params.id)) {
@@ -28,6 +32,7 @@ const addWishlistItem = async (req, res) => {
     }
 };
 
+// Bỏ sản phẩm khỏi yêu thích của chính tài khoản đang dùng.
 const removeWishlistItem = async (req, res) => {
     try {
         if (!mongoose.isObjectIdOrHexString(req.params.id)) {

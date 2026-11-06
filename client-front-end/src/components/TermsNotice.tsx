@@ -1,3 +1,4 @@
+// Phần thông báo điều khoản gắn với các thao tác tài khoản.
 interface TermsNoticeProps {
   action: string; // Hành động người dùng đang làm, VD: "đăng nhập", "đăng ký"
 }

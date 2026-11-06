@@ -1,7 +1,16 @@
+// Product chứa thông tin chung; mỗi variant là một quy cách bán và có nhiều lô tồn kho khác hạn sử dụng.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
+// Một dòng stocks là một lô: cùng sản phẩm/SKU vẫn có thể có các lô khác hạn dùng.
 const stockSubSchema = new Schema({
+    // Mỗi lô có giá bán riêng. Lô cũ chưa có trường này dùng giá mặc định của SKU.
+    list_price: {
+        type: Number,
+        default: null,
+        min: 0,
+        validate: { validator: (value) => value == null || Number.isSafeInteger(value), message: 'Giá bán phải là số nguyên' }
+    },
     batch_code: {
         type: String,
         required: true
@@ -25,6 +34,7 @@ const stockSubSchema = new Schema({
     }
 }, { _id: false });
 
+// Quy cách/SKU có đơn vị, bước lượng và giá niêm yết riêng; ví dụ bán theo 0.5 kg hoặc nguyên một khay.
 const variantSubSchema = new Schema({
     sku: {
         type: String,
@@ -104,6 +114,7 @@ const productSchema = new Schema({
     }
 });
 
+// SKU cần duy nhất giữa các sản phẩm; validator phía dưới còn chặn trùng SKU trong cùng một mảng variants.
 productSchema.index({ 'variants.sku': 1 }, { unique: true, sparse: true });
 
 productSchema.index({ category_id: 1, status: 1, created_at: -1 });

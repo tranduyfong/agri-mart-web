@@ -1,7 +1,10 @@
+// Nhận request của nhóm giỏ hàng, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống nhất dữ liệu
+// trả cho frontend.
 const mongoose = require('mongoose');
 const cartService = require('../services/cart.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+// Lấy giỏ của user trong JWT, không nhận ID tài khoản tùy ý từ trình duyệt.
 const getCart = async (req, res) => {
     try {
         const items = await cartService.getCart(req.user.userId);
@@ -11,6 +14,7 @@ const getCart = async (req, res) => {
     }
 };
 
+// Kiểm tra ID quy cách/số lượng và trả lại giỏ sau khi thêm thành công.
 const addCartItem = async (req, res) => {
     try {
         const { variant_id, quantity } = req.body || {};
@@ -38,6 +42,7 @@ const addCartItem = async (req, res) => {
     }
 };
 
+// Nhận dòng giỏ/số lượng cần sửa; service kiểm tra dòng thuộc tài khoản và tồn hiện tại.
 const updateCartItem = async (req, res) => {
     try {
         const { quantity } = req.body || {};
@@ -65,6 +70,7 @@ const updateCartItem = async (req, res) => {
     }
 };
 
+// Xóa dòng thuộc giỏ của người đăng nhập và trả dữ liệu cập nhật.
 const removeCartItem = async (req, res) => {
     try {
         if (!mongoose.isObjectIdOrHexString(req.params.id)) {

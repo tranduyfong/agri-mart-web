@@ -1,3 +1,4 @@
+// Ô nhập OTP dùng Ant Design; giá trị và sự kiện thay đổi được chuyển cho form cha.
 import { Input } from 'antd';
 import { OTP_LENGTH } from '../utils/constants';
 

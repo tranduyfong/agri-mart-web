@@ -1,3 +1,4 @@
+// Tiêu đề và lời hướng dẫn dùng chung cho các form đăng nhập/đăng ký/xác minh.
 import type { ReactNode } from 'react';
 
 interface AuthFormHeaderProps {

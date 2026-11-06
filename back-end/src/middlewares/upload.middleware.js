@@ -1,3 +1,4 @@
+// Nhận file multipart bằng Multer, chọn thư mục lưu và giới hạn định dạng/số lượng/kích thước ảnh.
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');

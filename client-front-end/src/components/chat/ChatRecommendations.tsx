@@ -1,3 +1,4 @@
+// Thẻ gợi ý AI dùng giá/tồn từ backend; nút đặt một món/cả nhóm chuyển thẳng sang checkout.
 import { Button, Image } from 'antd';
 import { ShoppingCartOutlined } from '@ant-design/icons';
 import type { ChatRecommendation } from '../../types/chat';
@@ -13,7 +14,9 @@ const ChatRecommendations = ({ items }: { items: ChatRecommendation[] }) => (
           style={{ objectFit: 'contain', borderRadius: 8 }} />
         <div className="min-w-0 flex-1"><p className="text-xs font-semibold text-gray-800">{item.name}</p>
           <p className="mt-1 text-[11px] text-gray-500">{item.variant_name} · {item.quantity} {item.unit}</p>
-          <p className="mt-1 text-xs font-semibold text-primary">{item.price == null ? 'Ngừng bán' : formatPrice(item.price) + '/' + item.unit}</p></div>
+          <p className="mt-1 text-xs font-semibold text-primary">
+            {item.price == null ? 'Ngừng bán' : item.line_total != null ? `Tổng: ${formatPrice(item.line_total)}` : formatPrice(item.price) + '/' + item.unit}
+          </p></div>
       </div>
       {item.available ? <Button className="mt-3 w-full" size="small" icon={<ShoppingCartOutlined />}
         href={getDirectCheckoutPath([item])}>Đặt sản phẩm này</Button>

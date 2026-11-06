@@ -1,3 +1,4 @@
+// Có kiểm tra cấu trúc một cửa hàng lúc khởi động; các hàm chuyển dữ liệu còn lại phục vụ script chuyển dữ liệu cũ.
 const mongoose = require('mongoose');
 
 // Chỉ script chuyển dữ liệu mới đọc các trường cũ. Hệ thống bán hàng không dùng chúng nữa.
@@ -36,6 +37,7 @@ const getPlan = async () => {
     };
 };
 
+// Guard lúc khởi động: chặn chạy trên dữ liệu còn cấu trúc nhiều cơ sở để tránh tính sai tồn.
 const assertMigrated = async () => {
     if ((await getPlan()).needs_migration) {
         throw new Error('Dữ liệu còn dùng cơ sở cũ. Dừng backend rồi chạy: npm run migrate:single-store -- --apply');

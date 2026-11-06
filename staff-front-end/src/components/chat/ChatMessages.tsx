@@ -1,3 +1,4 @@
+// Hiển thị bong bóng tin, ảnh và thời gian; giữ vị trí cuộn khi đọc tin cũ hoặc tải thêm lịch sử.
 import { useLayoutEffect, useRef } from 'react';
 import { Button, Image } from 'antd';
 import { CommentOutlined } from '@ant-design/icons';
@@ -17,6 +18,7 @@ const ChatMessages = ({ messages, customerView = false, hasMore, loadingOlder, o
   const stickToBottom = useRef(true);
   const previous = useRef({ first: '', last: '', height: 0 });
   const first = messages[0]?.id || '', last = messages.at(-1)?.id || '';
+  // Đo sau khi DOM đổi: giữ vị trí khi tải tin cũ và chỉ tự xuống cuối trong các trường hợp phù hợp.
   useLayoutEffect(() => {
     const element = scroll.current;
     if (!element) return;

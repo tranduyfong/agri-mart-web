@@ -1,3 +1,4 @@
+// Tiêu đề một khu vực trang và hành động phụ nếu có, giúp các section có cách hiển thị thống nhất.
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 

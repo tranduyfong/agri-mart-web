@@ -1,3 +1,4 @@
+// Chọn ảnh từ file hoặc URL, hiển thị xem trước và báo thao tác giữ/thay/xóa cho form cha.
 import { Button, Input, Upload } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { getFileUrl } from '../utils/fileUrl';

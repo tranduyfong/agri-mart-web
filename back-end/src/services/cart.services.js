@@ -1,8 +1,10 @@
+// Giỏ hàng lưu trong User; khi đọc/thay đổi phải đối chiếu quy cách, giá và tồn còn hạn của Product.
 const User = require('../models/user');
 const Product = require('../models/product');
 const { getProductDiscounts } = require('./product.services');
-const { availableStock } = require('../utils/productStock.util');
+const { availableStock, getVariantPrice, getSaleQuote } = require('../utils/productStock.util');
 
+// Số lượng phải dương, tối đa ba chữ số thập phân và đúng bội số bước bán; tồn được kiểm tra ở hàm gọi.
 const validateQuantity = (quantity, step) => {
     const units = Math.round(quantity * 1000);
     const stepUnits = Math.round(step * 1000);
@@ -12,6 +14,7 @@ const validateQuantity = (quantity, step) => {
     }
 };
 
+// Ghép giỏ đã lưu với giá, ưu đãi và lượng tồn mới nhất để giao diện không dùng số liệu cũ.
 const getCart = async (userId) => {
     const user = await User.findById(userId).populate({ path: 'cart_items.product_id', populate: { path: 'category_id', select: 'name' } });
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -33,7 +36,9 @@ const getCart = async (userId) => {
             sku: variant.sku,
             unit: variant.unit,
             step_quantity: variant.step_quantity,
-            list_price: variant.list_price,
+            list_price: getVariantPrice(variant),
+            ...(item.quantity <= availableStock(variant)
+                ? getSaleQuote(variant, item.quantity, discounts[product._id.toString()] || 0) : {}),
             product_id: product._id.toString(),
             name: product.name,
             slug: product.slug,
@@ -48,6 +53,7 @@ const getCart = async (userId) => {
     return items.reverse();
 };
 
+// Cộng lượng vào quy cách đã có hoặc thêm dòng mới, sau khi kiểm tra kho.
 const addCartItem = async (userId, variantId, quantity) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -75,6 +81,7 @@ const addCartItem = async (userId, variantId, quantity) => {
     await user.save();
 };
 
+// Sửa lượng của dòng thuộc đúng tài khoản và kiểm tra lại bước bán/tồn kho.
 const updateCartItem = async (userId, itemId, quantity) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -93,6 +100,7 @@ const updateCartItem = async (userId, itemId, quantity) => {
     await user.save();
 };
 
+// Chỉ xóa dòng giỏ hàng trong User đang đăng nhập.
 const removeCartItem = async (userId, itemId) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('USER_NOT_FOUND');

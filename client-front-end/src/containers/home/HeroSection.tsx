@@ -1,3 +1,4 @@
+// Banner đầu trang tự chuyển ảnh, tìm kiếm sản phẩm và popup quảng cáo chỉ có ảnh liên kết/nút đóng.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Carousel, Input, Modal, Select } from 'antd';
@@ -24,7 +25,7 @@ const BANNERS = [
   {
     image: storeImage,
     title: 'Đi chợ thật tiện, chọn gì cũng có',
-    description: 'Mua sắm thực phẩm yêu thích ngay tại AgriFood Smart.',
+    description: 'Mua sắm thực phẩm yêu thích ngay tại Agri-Mart.',
   },
 ];
 
@@ -35,6 +36,7 @@ const HeroSection = () => {
   const [keyword, setKeyword] = useState('');
   const [banners, setBanners] = useState<PublicBanner[]>([]);
   const [popup, setPopup] = useState<PublicBanner | null>(null);
+  // Tải ảnh banner/popup từ backend khi mở trang; dữ liệu tải về sau khi rời trang không được ghi vào state.
   useEffect(() => {
     let active = true;
     contentService
@@ -53,6 +55,7 @@ const HeroSection = () => {
       active = false;
     };
   }, []);
+  // Đóng ảnh quảng cáo và ghi nhớ trạng thái theo cách component đang quản lý.
   const closePopup = () => {
     if (popup) sessionStorage.setItem('banner.closed.' + popup.id, '1');
     setPopup(null);

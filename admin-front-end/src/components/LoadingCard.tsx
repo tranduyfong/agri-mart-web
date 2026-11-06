@@ -1,3 +1,4 @@
+// Hiển thị đang tải hoặc lỗi kèm nút thử lại cho các màn hình quản lý.
 import { Alert, Button, Skeleton } from 'antd';
 import Panel from './Panel';
 const LoadingCard = ({ error, onRetry }: { error?: string; onRetry?: () => void }) => (

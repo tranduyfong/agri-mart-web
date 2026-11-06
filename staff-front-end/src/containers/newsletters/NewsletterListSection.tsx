@@ -1,3 +1,4 @@
+// Danh sách bản tin và các số liệu đăng ký/gửi thành công/thất bại.
 import { useCallback, useState } from 'react';
 import { Button, Table } from 'antd';
 import { Link } from 'react-router-dom';

@@ -1,3 +1,4 @@
+// Quản lý tải tỉnh/phường xã; hủy request cũ khi đổi tỉnh để không hiển thị nhầm danh sách.
 import { useEffect, useState } from 'react';
 import addressService from '../services/addressService';
 import type { AddressOption } from '../types/address';
@@ -17,6 +18,7 @@ const useAddressOptions = (provinceCode?: number) => {
   const provinceKey = String(provinceRetry);
   const wardKey = JSON.stringify([provinceCode, wardRetry]);
 
+  // Lấy danh sách tỉnh và cho phép thử lại; cleanup hủy request khi lần tải đã hết hiệu lực.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -43,6 +45,7 @@ const useAddressOptions = (provinceCode?: number) => {
     return () => controller.abort();
   }, [provinceKey]);
 
+  // Tỉnh thay đổi thì tải đúng danh sách phường/xã và hủy request của tỉnh cũ.
   useEffect(() => {
     if (!provinceCode) return;
     const controller = new AbortController();

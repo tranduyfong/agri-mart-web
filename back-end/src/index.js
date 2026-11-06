@@ -1,3 +1,4 @@
+// Điểm khởi động backend: gắn middleware, API và Socket, kết nối MongoDB rồi chạy các tác vụ nền.
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -12,6 +13,7 @@ const app = express();
 const server = http.createServer(app);
 socketConfig.init(server);
 
+// Middleware chạy theo thứ tự này: cho phép truy cập API, đọc body và phục vụ file trước khi tìm route.
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -35,6 +37,7 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 8000;
 
+// Mọi tác vụ cần DB chỉ khởi động sau khi kết nối và kiểm tra dữ liệu thành công.
 connection()
     .then(async () => {
         await require('./services/newsletter.services').recoverSending();
@@ -42,6 +45,7 @@ connection()
         require('./services/chatAi.services').startWorker();
         server.listen(PORT, () => console.log('Server is running on port ' + PORT));
         let checkingPayments = false;
+        // Kiểm tra VNPay định kỳ; cờ checkingPayments tránh hai lượt kiểm tra chạy chồng nhau.
         const timer = setInterval(async () => {
             if (checkingPayments) return;
             checkingPayments = true;

@@ -1,3 +1,4 @@
+// Đọc phiên đăng nhập và hàm kiểm tra quyền từ AuthContext của ứng dụng quản lý.
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 const useAuth = () => {

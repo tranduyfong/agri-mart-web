@@ -1,3 +1,4 @@
+// Thẻ sản phẩm hiển thị ảnh/giá/ưu đãi/tồn và dùng các thao tác giỏ hàng, yêu thích chung.
 import { App } from 'antd';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -33,10 +34,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const originalPrice = product.min_price || 0;
   const salePrice = product.discount_percent ? originalPrice * (1 - product.discount_percent / 100) : originalPrice;
 
+  // Chọn thêm hoặc bỏ yêu thích dựa trên trạng thái đã lưu trong Redux.
   const toggleFavorite = (source: HTMLElement) => {
     runMutation({ kind: isFavorite ? 'removeWishlist' : 'addWishlist', productId: product.id }, source);
   };
 
+  // Dùng quy cách phù hợp hoặc mở hộp chọn khi sản phẩm cần người dùng chọn thêm.
   const addToCart = async (source: HTMLElement) => {
     if (addingRef.current || !requireLogin()) return;
     addingRef.current = true;

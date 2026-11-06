@@ -1,3 +1,5 @@
+// Đường dẫn cho các chức năng nhân viên theo nhóm quyền; nối URL tới controller.
+// Những middleware được khai báo trên route sẽ chạy trước handler theo thứ tự từ trái sang phải.
 const express = require('express');
 const controller = require('../controllers/staff.controllers');
 const productController = require('../controllers/product.controllers');

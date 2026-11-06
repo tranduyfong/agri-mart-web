@@ -1,3 +1,4 @@
+// Nhân viên xem đơn, xác nhận qua điện thoại và cập nhật từng bước giao hàng; hủy đơn phải trả lại đúng lô.
 const mongoose = require('mongoose');
 const Order = require('../models/order');
 const Product = require('../models/product');
@@ -5,6 +6,7 @@ const { escapeRegex } = require('../utils/string.util');
 const { getToday, parseDate } = require('../utils/date.util');
 const { notifyOrdersChanged } = require('../utils/orderEvents.util');
 
+// Tìm đơn theo bộ lọc/mã/số điện thoại và phân trang danh sách xử lý.
 const getOrders = async (filters, pagination) => {
     // Danh sách đơn hàng của cửa hàng.
     const query = {};
@@ -41,6 +43,7 @@ const getOrders = async (filters, pagination) => {
     };
 };
 
+// Đọc chi tiết giao hàng, sản phẩm, thanh toán và các bước xử lý của đơn.
 const getOrder = async (id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const order = await Order.findById(id)
@@ -59,13 +62,14 @@ const getOrder = async (id) => {
                 name: item.name || item.product_id?.name || 'Sản phẩm đã ngừng kinh doanh',
                 variant_name: item.variant_name || variant?.name,
                 unit: item.unit || variant?.unit,
-                line_total: Math.round(item.price * item.quantity)
+                line_total: item.line_total ?? Math.round(item.price * item.quantity)
             };
         }),
         status_history: (order.status_history || []).map((entry) => ({ ...entry, staff_name: entry.changed_by?.full_name || 'Hệ thống' }))
     };
 };
 
+// Chỉ cho chuyển bước hợp lệ; xác nhận mở VNPay, hoàn tất thu COD, hủy trả lại đúng lô.
 const updateStatus = async (userId, id, data) => {
     if (!mongoose.isObjectIdOrHexString(id) || typeof data.note !== 'string' || data.note.length > 1000) throw new Error('INVALID_DATA');
     const transitions = { PENDING: ['CONFIRMED', 'CANCELLED'], CONFIRMED: ['SHIPPING', 'CANCELLED'], SHIPPING: ['COMPLETED'] };
@@ -132,6 +136,7 @@ const updateStatus = async (userId, id, data) => {
     return getOrder(id);
 };
 
+// Đếm đơn cần xác nhận để cập nhật huy hiệu đỏ trên giao diện nhân viên.
 const getSummary = async () => ({ pending_count: await Order.countDocuments({ status: 'PENDING' }) });
 
 module.exports = { getOrders, getOrder, updateStatus, getSummary };

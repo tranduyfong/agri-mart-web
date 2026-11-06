@@ -1,3 +1,4 @@
+// Tải chi tiết theo slug và bỏ kết quả của request cũ khi người dùng chuyển sản phẩm.
 import { useEffect, useState } from 'react';
 import productService from '../services/productService';
 import type { ProductDetail } from '../types/product';
@@ -16,6 +17,7 @@ const useProductDetail = (slug: string) => {
   const [result, setResult] = useState<ProductDetailResult | null>(null);
   const requestKey = JSON.stringify([slug, retryCount]);
 
+  // Tải theo slug và bỏ phản hồi cũ khi người dùng chuyển sang chi tiết sản phẩm khác.
   useEffect(() => {
     let isOutdated = false;
 

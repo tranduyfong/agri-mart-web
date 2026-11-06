@@ -1,3 +1,4 @@
+// Khung trắng có tiêu đề dùng chung để nhóm form/bảng/thông tin.
 import type { ReactNode } from 'react';
 const Panel = ({ title, children, extra }: { title?: string; children: ReactNode; extra?: ReactNode }) => (
   <section className="min-w-0 rounded-2xl border border-line bg-white p-5 sm:p-7">

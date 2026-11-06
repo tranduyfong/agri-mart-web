@@ -1,3 +1,4 @@
+// Danh sách nhóm quyền được backend chấp nhận khi cấp quyền cho nhân viên.
 const STAFF_PERMISSIONS = [
     { code: 'PRODUCT_MANAGE', name: 'Sản phẩm và danh mục', description: 'Xem, thêm và cập nhật sản phẩm, ảnh, giá và danh mục.' },
     { code: 'INVENTORY_MANAGE', name: 'Kho và nhập hàng', description: 'Xem tồn kho, kiểm tra file và xác nhận nhập hàng.' },

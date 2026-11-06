@@ -1,3 +1,4 @@
+// Ô soạn tin dùng cho chữ và ảnh; giữ bản nháp khi gửi lỗi và chặn bấm gửi trùng lúc đang xử lý.
 import { useRef, useState } from 'react';
 import { App, Button, Input, Tooltip, Upload } from 'antd';
 import type { UploadFile } from 'antd';
@@ -11,6 +12,7 @@ const ChatComposer = ({ disabled = false, placeholder = 'Nhập tin nhắn...', 
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [busy, setBusy] = useState(false);
   const sending = useRef(false), clientId = useRef<string | null>(null);
+  // Ghép chữ/ảnh vào FormData; giữ cùng client_id khi gửi lại để backend nhận ra bản tin trùng.
   const send = async () => {
     if (disabled || sending.current || (!content.trim() && !files.length)) return;
     sending.current = true; setBusy(true);

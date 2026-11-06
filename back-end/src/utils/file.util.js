@@ -1,3 +1,4 @@
+// Xử lý URL ảnh và xóa những file upload được các luồng lưu dữ liệu chuyển vào khi cần dọn dẹp.
 const fs = require('fs');
 
 /**

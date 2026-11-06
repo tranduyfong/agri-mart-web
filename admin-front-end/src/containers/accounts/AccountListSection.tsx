@@ -1,3 +1,4 @@
+// Tra cứu tài khoản theo tên/email/vai trò/trạng thái; mở form sửa hoặc thực hiện khóa/mở khóa.
 import { useCallback, useState } from 'react';
 import { Alert, App, Button, Input, Modal, Select, Table } from 'antd';
 import { Link } from 'react-router-dom';
@@ -19,6 +20,7 @@ const AccountListSection = () => {
   const { modal, message } = App.useApp();
   const load = useCallback(() => accountService.getAccounts(query), [query]);
   const { data, error, reload } = useData(load);
+  // Gửi trạng thái khóa/mở cùng trạng thái hiện tại để tránh thao tác trên dữ liệu đã cũ.
   const setLock = (account: Account) =>
     modal.confirm({
       title: account.status === 'LOCKED' ? 'Mở khóa tài khoản?' : 'Khóa tài khoản này?',

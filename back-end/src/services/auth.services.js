@@ -1,3 +1,4 @@
+// Xử lý đăng ký/đăng nhập, OTP email và quên mật khẩu; mật khẩu được băm, phiên được kiểm tra bằng token_version.
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -6,6 +7,7 @@ const transporter = require('../configs/mailer.config');
 const { getOtpEmailTemplate, getVerifyEmailTemplate } = require('../utils/mail.util');
 const { getProfile } = require('./account.services');
 
+// Gửi mã OTP qua bộ gửi mail dùng chung; mã và thời hạn được quản lý ở tài khoản.
 const sendOtp = async (email, otp, isVerifyEmail) => {
     await transporter.sendMail({
         from: '"AgriFood Smart" <' + process.env.EMAIL_USER + '>',
@@ -15,6 +17,7 @@ const sendOtp = async (email, otp, isVerifyEmail) => {
     });
 };
 
+// Kiểm tra email, băm mật khẩu và tạo tài khoản chờ xác minh trước khi gửi OTP.
 const registerUser = async ({ full_name, email, password, phone }) => {
     email = email.trim().toLowerCase();
     const conditions = [{ email }];
@@ -42,6 +45,7 @@ const registerUser = async ({ full_name, email, password, phone }) => {
     return getProfile(user._id);
 };
 
+// Kiểm tra mật khẩu và trạng thái tài khoản, rồi phát JWT có phiên bản phiên hiện tại.
 const loginUser = async (email, password) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() }).select('+password_hash +token_version');
 
@@ -58,6 +62,7 @@ const loginUser = async (email, password) => {
     return { user: await getProfile(user._id), accessToken };
 };
 
+// Kiểm tra OTP còn hạn/số lần thử và kích hoạt tài khoản khi xác minh thành công.
 const verifyEmailAccount = async (email, otp) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() }).select(
         '+email_verify_token +email_verify_expires +email_verify_attempts'
@@ -87,6 +92,7 @@ const verifyEmailAccount = async (email, otp) => {
     await user.save();
 };
 
+// Gửi mã xác minh mới, cập nhật hạn dùng và đặt lại bộ đếm số lần nhập sai.
 const resendVerifyEmail = async (email) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -102,6 +108,7 @@ const resendVerifyEmail = async (email) => {
     await user.save();
 };
 
+// Tạo và gửi OTP quên mật khẩu cho tài khoản tìm được, lưu thời hạn và đặt lại số lần thử.
 const requestPasswordReset = async (email) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) throw new Error('USER_NOT_FOUND');
@@ -116,6 +123,7 @@ const requestPasswordReset = async (email) => {
     await user.save();
 };
 
+// Đối chiếu OTP/thời hạn/số lần thử rồi trả User hợp lệ để luồng đặt mật khẩu mới tiếp tục.
 const verifyResetOtp = async (email, otp) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() }).select(
         '+password_reset_token +password_reset_expires +password_reset_attempts +token_version'
@@ -139,6 +147,7 @@ const verifyResetOtp = async (email, otp) => {
     return user;
 };
 
+// Kiểm tra bằng chứng đã xác minh OTP, đổi mật khẩu và thu hồi các phiên đăng nhập cũ.
 const resetPassword = async (email, otp, newPassword) => {
     const user = await verifyResetOtp(email, otp);
     user.password_hash = await bcrypt.hash(newPassword, 10);

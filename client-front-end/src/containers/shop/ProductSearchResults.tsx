@@ -1,3 +1,4 @@
+// Đồng bộ tìm kiếm/bộ lọc/sắp xếp/phân trang với URL và hiển thị từ khóa sửa lỗi nếu backend có gợi ý.
 import { useSearchParams } from 'react-router-dom';
 import { Checkbox, Empty, Pagination, Select } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';

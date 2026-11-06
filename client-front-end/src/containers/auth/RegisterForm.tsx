@@ -1,3 +1,4 @@
+// Form đăng ký kiểm tra dữ liệu rồi chuyển email sang màn hình xác minh OTP.
 import { useState } from 'react';
 import { App, Form } from 'antd';
 import { useNavigate } from 'react-router-dom';

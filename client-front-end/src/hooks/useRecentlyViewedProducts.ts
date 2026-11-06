@@ -1,3 +1,4 @@
+// Đọc các slug đã xem và tải thông tin sản phẩm hiện tại, bỏ mục đang mở.
 import { useEffect, useState } from 'react';
 import productService from '../services/productService';
 import type { ProductDetail } from '../types/product';
@@ -9,6 +10,7 @@ const useRecentlyViewedProducts = (currentSlug: string) => {
   const [products, setProducts] = useState<ProductDetail[]>([]);
   const [isLoading, setIsLoading] = useState(slugs.length > 0);
 
+  // Đọc các slug lịch sử và lấy lại dữ liệu sản phẩm, không đưa sản phẩm đang mở vào hàng gợi ý này.
   useEffect(() => {
     let isOutdated = false;
     if (currentSlug) saveViewedProduct(currentSlug);

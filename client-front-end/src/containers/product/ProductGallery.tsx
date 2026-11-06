@@ -1,3 +1,4 @@
+// Ảnh lớn và các ảnh thu nhỏ; thay lựa chọn khi người dùng bấm ảnh khác.
 import { useRef, useState } from 'react';
 import { Image } from 'antd';
 import { LeftOutlined, RightOutlined, ShoppingOutlined, ZoomInOutlined } from '@ant-design/icons';
@@ -16,6 +17,7 @@ const ProductGallery = ({ images, productName, discountPercent }: ProductGallery
   const thumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const activeImage = images[activeIndex];
 
+  // Chuyển ảnh được chọn thành ảnh lớn đang hiển thị.
   const selectImage = (index: number) => {
     setActiveIndex(index);
     thumbnailRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });

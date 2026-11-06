@@ -1,3 +1,4 @@
+// Khung tải tạm cho vùng ảnh và thông tin chi tiết sản phẩm.
 import { Skeleton } from 'antd';
 
 // Giữ bố cục ảnh và thông tin trong lúc chờ API chi tiết

@@ -1,6 +1,9 @@
+// Nhận request của nhóm tỉnh/phường xã, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống nhất dữ
+// liệu trả cho frontend.
 const addressService = require('../services/address.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 
+// Gọi service địa chỉ và trả danh sách tỉnh; lỗi dịch vụ ngoài được đổi thành response API.
 const getProvinces = async (req, res) => {
     try {
         const provinces = await addressService.getProvinces();
@@ -10,6 +13,7 @@ const getProvinces = async (req, res) => {
     }
 };
 
+// Đọc mã tỉnh từ URL rồi lấy danh sách phường/xã tương ứng.
 const getWardsByProvince = async (req, res) => {
     try {
         const wards = await addressService.getWardsByProvince(req.params.code);

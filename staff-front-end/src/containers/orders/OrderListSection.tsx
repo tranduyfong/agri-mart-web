@@ -1,3 +1,4 @@
+// Danh sách đơn cho nhân viên, có bộ lọc trạng thái/từ khóa và thông báo thay đổi.
 import { useCallback, useState } from 'react';
 import { Alert, Badge, Button, Input, Select } from 'antd';
 import { useLocation, useSearchParams } from 'react-router-dom';
@@ -25,6 +26,7 @@ const OrderListSection = () => {
     [filters, search],
   );
   const { data, loading, error, reload } = useData(load, 30000, ordersRevision);
+  // Thay bộ lọc danh sách và đưa phân trang về vị trí phù hợp.
   const changeFilter = (value: string) => {
     setParams(value ? { status: value } : {});
     setQuery((previous) => ({ ...previous, pageNumber: 0 }));

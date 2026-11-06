@@ -1,3 +1,4 @@
+// Lưu thời gian, điều kiện và mức ưu đãi cho sản phẩm hoặc mã giảm giá/phí giao hàng.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

@@ -1,8 +1,11 @@
+// Nhận request của nhóm productChange, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống nhất dữ
+// liệu trả cho frontend.
 const service = require('../services/productChange.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { staffErrorResponse } = require('../utils/staffError.util');
 const { getPagination, buildPagination } = require('../utils/pagination.util');
 
+// Đọc bộ lọc và vai trò để lấy đúng danh sách yêu cầu sản phẩm.
 const getChanges = async (req, res) => {
     try {
         const { status, type } = req.query;
@@ -15,6 +18,7 @@ const getChanges = async (req, res) => {
         return staffErrorResponse(res, error);
     }
 };
+// Lấy chi tiết đề nghị với quyền người xem được service kiểm tra lại.
 const getChange = async (req, res) => {
     try {
         return successResponse(res, await service.getChange(req.user, req.params.id));
@@ -22,6 +26,7 @@ const getChange = async (req, res) => {
         return staffErrorResponse(res, error);
     }
 };
+// Nhận quyết định của admin và gửi đến service duyệt/từ chối có transaction.
 const reviewChange = async (req, res) => {
     if (req.user.role !== 'ADMIN') return errorResponse(res, 'FORBIDDEN', 'Chỉ quản trị viên được duyệt', 403);
     try {

@@ -1,3 +1,4 @@
+// Cache danh mục trong Redux cùng trạng thái tải để các vùng giao diện dùng chung một kết quả.
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import categoryService from '../../services/categoryService';
 import type { Category } from '../../types/category';

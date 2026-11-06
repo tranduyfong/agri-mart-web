@@ -1,3 +1,4 @@
+// Chọn địa chỉ đã lưu, kiểm tra người nhận/mã giảm và gửi đơn với số tiền đã được backend tính lại.
 import { useRef, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
@@ -63,18 +64,21 @@ const CheckoutForm = ({
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
+  // Đổi địa chỉ đang dùng cho đơn và tự điền tên/số điện thoại của người nhận.
   const selectAddress = (id: string, list = addresses) => {
     setAddressId(id);
     const address = list.find((item) => item.id === id);
     if (address) form.setFieldsValue({ recipient_name: address.recipient_name, phone: address.phone });
   };
 
+  // Nhận lại sổ địa chỉ sau khi thêm/sửa từ modal để form thanh toán dùng dữ liệu mới.
   const addressesUpdated = (list: UserAddress[]) => {
     const added = list.find((address) => !addresses.some((item) => item.id === address.id));
     setAddresses(list);
     if (added) selectAddress(added.id, list);
   };
 
+  // Gọi lại preview để backend quyết định mã hợp lệ và tính đúng tổng tiền.
   const applyCoupon = async (code: string) => {
     if (applyingCouponRef.current || submittingRef.current) return;
     applyingCouponRef.current = true;
@@ -104,6 +108,7 @@ const CheckoutForm = ({
     }
   };
 
+  // Gửi đơn với địa chỉ, cách trả tiền, lựa chọn sản phẩm và khóa chống đặt lặp; xử lý thay đổi giá/kho từ backend.
   const handleSubmit = async (values: CheckoutFormValues) => {
     if (submittingRef.current || applyingCouponRef.current || !selectedAddress) return;
     submittingRef.current = true;

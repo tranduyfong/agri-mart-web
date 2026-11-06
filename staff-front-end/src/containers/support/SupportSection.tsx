@@ -1,3 +1,4 @@
+// Hộp thư khách hàng theo kiểu Messenger: chọn hội thoại, tiếp nhận từ AI, trả lời chữ/ảnh và kết thúc hỗ trợ.
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, App, Avatar, Badge, Button, Empty, Input, Select, Spin, Tooltip } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, CommentOutlined, CustomerServiceOutlined } from '@ant-design/icons';
@@ -18,12 +19,14 @@ const Conversation = ({ id, active, onBack }: { id: string; active: boolean; onB
   const chat = useConversation(id, chatRevision, atBottom, active);
   const room = chat.room;
   const canReply = room?.status === 'STAFF_ACTIVE' && room.assigned_staff_id === user?.id;
+  // Tiếp nhận hội thoại qua backend; khi thành công thì mới mở ô trả lời và dừng AI.
   const claim = async () => {
     setBusy(true);
     try { await supportService.claimRoom(id); chat.reload(); }
     catch (error) { void message.error(getErrorMessage(error)); }
     finally { setBusy(false); }
   };
+  // Hỏi xác nhận kết thúc hỗ trợ; lịch sử vẫn được giữ để khách có thể nhắn lại.
   const close = () => modal.confirm({ title: 'Kết thúc cuộc trò chuyện?', content: 'Lịch sử tin nhắn vẫn được lưu. Khách hàng có thể nhắn lại khi cần hỗ trợ.',
     okText: 'Kết thúc', cancelText: 'Tiếp tục hỗ trợ', onOk: async () => {
       try { await supportService.closeRoom(id); chat.reload(); }
@@ -62,6 +65,7 @@ const SupportSection = () => {
   const activeId = rooms.data?.some((room) => room.id === selectedId) ? selectedId : undefined;
   // Màn hình rộng luôn mở khung chi tiết; điện thoại chỉ đánh dấu đọc sau khi chọn hội thoại.
   const [wide, setWide] = useState(() => window.matchMedia('(min-width: 768px)').matches);
+  // Theo dõi breakpoint để trên điện thoại chỉ phòng đã mở mới được đánh dấu đọc.
   useEffect(() => {
     const media = window.matchMedia('(min-width: 768px)');
     const update = () => setWide(media.matches);

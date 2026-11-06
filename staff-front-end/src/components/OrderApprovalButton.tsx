@@ -1,3 +1,4 @@
+// Nút nhân viên xác nhận đơn sau khi gọi khách; chặn bấm lặp và tải lại dữ liệu khi xử lý xong.
 import { useState } from 'react';
 import { App, Button, Input } from 'antd';
 import { CheckOutlined } from '@ant-design/icons';
@@ -13,6 +14,7 @@ const OrderApprovalButton = ({ order, onApproved }: { order: StaffOrder; onAppro
 
   if (order.status !== 'PENDING' || !hasPermission('ORDER_MANAGE')) return null;
 
+  // Xác nhận đơn qua API sau thao tác của nhân viên; thành công mới tải lại số đơn chờ.
   const approve = () => {
     let note = '';
     modal.confirm({

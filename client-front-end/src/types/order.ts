@@ -1,6 +1,9 @@
+// Kiểu dòng hàng, preview, đơn đã đặt và payload checkout; mua ngay có thể là một món hoặc mảng món.
 import type { UserAddress } from './account';
+import type { LotPricePart } from '../utils/lotPricing';
 
 export interface CheckoutItem {
+  price_breakdown?: LotPricePart[];
   product_id: string;
   variant_id: string;
   name: string;

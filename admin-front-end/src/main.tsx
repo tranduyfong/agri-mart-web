@@ -1,3 +1,5 @@
+// Điểm khởi động React: nạp font/CSS, theme/locale, hiệu ứng AOS và Context phiên đăng nhập cho toàn ứng dụng quản
+// lý.
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App as AntdApp, ConfigProvider } from 'antd';
@@ -20,6 +22,7 @@ AOS.init({
   offset: 20,
   disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 });
+// Khởi tạo React cùng theme/locale và AuthProvider cho phiên quản trị viên, không cần Redux.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StyleProvider layer>

@@ -1,3 +1,4 @@
+// Form admin thêm nhân viên hoặc sửa thông tin tài khoản, bao gồm email.
 import { useState } from 'react';
 import { App, Button, Form, Input } from 'antd';
 import { Link } from 'react-router-dom';
@@ -15,6 +16,7 @@ const AccountForm = ({ account, onSaved }: { account: Account | null; onSaved: (
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const { user, logout } = useAuth();
+  // Chọn API thêm nhân viên hoặc cập nhật tài khoản, rồi báo cho danh sách tải lại.
   const submit = async (values: Values) => {
     setBusy(true);
     try {

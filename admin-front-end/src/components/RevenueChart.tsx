@@ -1,3 +1,4 @@
+// Biểu đồ doanh thu theo ngày từ dữ liệu backend, kèm nhãn và giá trị để đối chiếu.
 import { Empty, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import Panel from './Panel';

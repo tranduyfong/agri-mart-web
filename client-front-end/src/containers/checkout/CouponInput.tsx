@@ -1,8 +1,10 @@
+// Ô áp/xóa mã giảm; số tiền sau áp mã phải lấy lại từ API preview.
 import { useState } from 'react';
 import { Button, Input } from 'antd';
 import { CheckCircleFilled, TagOutlined } from '@ant-design/icons';
 import { formatPrice } from '../../utils/format';
 import type { CheckoutSummary } from '../../types/order';
+import CopyCodeButton from '../../components/CopyCodeButton';
 
 interface CouponInputProps {
   coupon: CheckoutSummary['coupon'];
@@ -14,6 +16,7 @@ interface CouponInputProps {
 
 const CouponInput = ({ coupon, isLoading, disabled, error, onApply }: CouponInputProps) => {
   const [code, setCode] = useState('');
+  // Chuẩn hóa mã trước khi gọi hàm áp mã, giữ trạng thái tải/lỗi để khách biết kết quả.
   const apply = () => {
     if (code.trim()) onApply(code.trim());
   };
@@ -60,6 +63,7 @@ const CouponInput = ({ coupon, isLoading, disabled, error, onApply }: CouponInpu
             <span className="flex min-w-0 items-center gap-2 font-semibold text-primary">
               <CheckCircleFilled className="shrink-0" />
               <span className="break-all">{coupon.code}</span>
+              <CopyCodeButton code={coupon.code} />
             </span>
             <Button
               htmlType="button"

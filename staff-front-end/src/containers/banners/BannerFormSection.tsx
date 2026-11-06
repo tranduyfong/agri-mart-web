@@ -1,3 +1,4 @@
+// Tải banner cần sửa, chuẩn bị dữ liệu ảnh/lịch hiển thị và lưu bản nháp hoặc banner đang bật.
 import { useCallback, useState } from 'react';
 import { App, Button, DatePicker, Form, Image, Input, Modal, Select, Space, Switch, Upload } from 'antd';
 import type { UploadFile } from 'antd';
@@ -33,6 +34,7 @@ const BannerForm = ({ banner }: { banner: Banner | null }) => {
   const imageUrl = Form.useWatch('image_url', form);
   const title = Form.useWatch('title', form);
   const isPopup = Form.useWatch('type', form) === 'POPUP';
+  // Đổi ngày/ảnh của form sang payload backend rồi lưu banner.
   const save = async (values: Values) => {
     if (!files.length && !values.image_url?.trim()) return void message.error('Hãy chọn ảnh hoặc nhập liên kết ảnh.');
     if (values.starts_at && values.ends_at && !values.ends_at.isAfter(values.starts_at))

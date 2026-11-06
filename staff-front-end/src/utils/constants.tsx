@@ -1,3 +1,4 @@
+// Tập trung đường dẫn, nhãn và các giá trị dùng nhiều nơi để các màn hình không tự khai báo lệch nhau.
 import {
   AppstoreOutlined,
   ProductOutlined,

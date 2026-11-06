@@ -1,3 +1,4 @@
+// Nhận sự kiện chat qua Socket, lấy số chưa đọc và cập nhật lại khi nối mạng/quay về tab.
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { isAxiosError } from 'axios';
@@ -6,10 +7,13 @@ import supportService from '../services/supportService';
 
 const useChatNotifications = (token: string | null, enabled: boolean) => {
   const [state, setState] = useState({ token, chatUnreadCount: 0, chatRevision: 0, chatConnected: false });
+  // Mở Socket khi có phiên/quyền hỗ trợ; lấy summary sau sự kiện, kết nối lại hoặc quay về tab và dọn kết nối khi rời
+  // phiên.
   useEffect(() => {
     if (!token || !enabled) return;
     let disposed = false, loading = false, queued = false;
     const socket = io(new URL(apiClient.defaults.baseURL!, window.location.origin).origin, { auth: { token }, autoConnect: false });
+    // Tải summary mới; nếu lượt trước chưa xong thì ghi nhận cần tải thêm thay vì gọi chồng request.
     const refresh = async () => {
       if (loading) { queued = true; return; }
       loading = true;

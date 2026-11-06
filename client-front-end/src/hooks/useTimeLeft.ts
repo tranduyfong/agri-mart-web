@@ -1,3 +1,4 @@
+// Tính ngày/giờ/phút/giây còn lại tới thời điểm kết thúc khuyến mãi.
 import { useEffect, useState } from 'react';
 
 // Tính thời gian còn lại từ bây giờ tới endTime
@@ -17,6 +18,7 @@ const getTimeLeft = (endTime: string) => {
 const useTimeLeft = (endTime: string) => {
   const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(endTime));
 
+  // Tính lại thời gian còn lại mỗi giây và dọn interval khi không còn dùng.
   useEffect(() => {
     const timer = setInterval(() => setTimeLeft(getTimeLeft(endTime)), 1000);
     return () => clearInterval(timer);

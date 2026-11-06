@@ -1,6 +1,9 @@
+// Đổi lỗi nghiệp vụ/Mongoose thành mã HTTP và thông báo tiếng Việt cho các API quản lý.
 const { errorResponse } = require('./response.util');
 
 const messages = {
+    AI_UNAVAILABLE: [409, 'Trợ lý AI đang tắt. Bạn có thể tiếp tục nhắn nhân viên cửa hàng.'],
+    SUPPLIER_CODE_EXISTS: [409, 'Mã nhà cung cấp đã tồn tại. Vui lòng chọn mã khác.'],
     CHAT_INVALID_IMAGE: [400, 'Ảnh không hợp lệ. Chọn JPG, PNG, GIF hoặc WEBP, mỗi ảnh tối đa 5 MB.'],
     PRODUCT_CHANGE_PENDING: [409, 'Sản phẩm đã có thay đổi đang chờ duyệt. Vui lòng chờ quản trị viên xử lý.'],
     PRODUCT_CHANGE_REVIEWED: [409, 'Yêu cầu đã được xử lý. Vui lòng tải lại danh sách.'],
@@ -24,6 +27,7 @@ const messages = {
     INVALID_DATA: [400, 'Thông tin không hợp lệ. Vui lòng kiểm tra các trường đã nhập.'],
     INVALID_ROWS: [400, 'Thông tin lô hàng không hợp lệ. Vui lòng kiểm tra lại file.'],
     SUPPLIER_NOT_FOUND: [400, 'Nhà cung cấp không tồn tại'],
+    SUPPLIER_REQUIRED: [400, 'Vui lòng chọn nhà cung cấp trước khi nhập hàng'],
     PRODUCT_HAS_NO_IMAGE: [400, 'Sản phẩm cần có ảnh trước khi đăng bán'],
     IMAGE_REQUIRED: [400, 'Sản phẩm cần có ảnh trước khi đăng bán'],
     IMPORT_INVALID_ROWS: [400, 'File còn dòng lỗi. Vui lòng kiểm tra lại trước khi nhập.'],

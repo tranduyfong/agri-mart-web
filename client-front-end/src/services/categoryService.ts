@@ -1,3 +1,5 @@
+// Các lời gọi API cho danh mục; tách giao tiếp HTTP khỏi component. response.data là thân response Axios, trường data
+// bên trong là dữ liệu nghiệp vụ.
 import apiClient from './apiClient';
 import type { PaginatedResponse } from '../types/api';
 import type { Category } from '../types/category';

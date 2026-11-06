@@ -1,3 +1,4 @@
+// Chân trang gồm các nhóm liên kết và form đăng ký nhận bản tin email.
 import { useState, type SubmitEvent } from 'react';
 import { App } from 'antd';
 import contentService from '../../services/contentService';
@@ -14,6 +15,7 @@ const Footer = () => {
   const [subscribing, setSubscribing] = useState(false);
   const { message } = App.useApp();
 
+  // Gửi email đăng ký bản tin và hiển thị thông báo từ API.
   const handleSubscribe = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (subscribing) return;

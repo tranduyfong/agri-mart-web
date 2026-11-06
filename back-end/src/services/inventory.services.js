@@ -1,3 +1,4 @@
+// Theo dõi tồn theo lô, kiểm tra từng dòng file nhập và gửi yêu cầu nhập hàng để chờ admin duyệt.
 const mongoose = require('mongoose');
 const Product = require('../models/product');
 const Order = require('../models/order');
@@ -6,7 +7,10 @@ const GoodsReceipt = require('../models/goodsReceipt');
 const productService = require('./product.services');
 const { normalizeSearch } = require('../utils/string.util');
 const { getToday, parseDate } = require('../utils/date.util');
+const { isImageUrl } = require('../utils/validation.util');
+const { getLotPrice } = require('../utils/productStock.util');
 
+// Trải các quy cách/lô thành dòng tồn kho, tính hạn dùng và áp dụng bộ lọc trước khi phân trang.
 const getInventory = async (filters, pagination) => {
     const [products, orders] = await Promise.all([
         Product.find().lean(),
@@ -45,6 +49,7 @@ const getInventory = async (filters, pagination) => {
                     physical_quantity: Math.round((stock.quantity + held) * 1000) / 1000,
                     reserved_quantity: Math.round(held * 1000) / 1000,
                     available_quantity: status === 'EXPIRED' ? 0 : stock.quantity,
+                    list_price: getLotPrice(variant, stock),
                     status
                 });
             }
@@ -52,8 +57,10 @@ const getInventory = async (filters, pagination) => {
     return { items: rows.slice(pagination.offset, pagination.offset + pagination.pageSize), totalElements: rows.length };
 };
 
+// Ô trống phải được coi là thiếu dữ liệu, không tự chuyển thành số 0.
 const numberValue = (value) => (value === '' || value == null ? NaN : Number(value));
 
+// Chỉ kiểm tra từng dòng và trả lỗi để sửa file; bước xem trước chưa cộng tồn hoặc tạo phiếu.
 const previewImport = async (rows) => {
     if (!Array.isArray(rows) || !rows.length || rows.length > 1000) throw new Error('INVALID_DATA');
     const skus = rows.map((row) => String(row?.sku || '').trim());
@@ -63,7 +70,9 @@ const previewImport = async (rows) => {
         Category.find()
     ]);
     const today = getToday();
+    // Nhớ các lô/SKU trong cùng file để phát hiện dòng trùng mã nhưng thông tin hoặc hạn sử dụng mâu thuẫn.
     const batches = new Map();
+    const batchPrices = new Map();
     const newSkus = new Map();
     const checked = rows.map((row, index) => {
         const errors = [];
@@ -78,9 +87,10 @@ const previewImport = async (rows) => {
             name: String(row?.name || '').trim(),
             variant_name: String(row?.variant_name || '').trim(),
             unit: String(row?.unit || 'kg').trim(),
+            image_url: typeof row?.image_url === 'string' ? row.image_url.trim() : row?.image_url ?? '',
             category_id: category?._id.toString() || byCode?.category_id.toString(),
             step_quantity: row?.step_quantity === '' || row?.step_quantity == null ? 1 : numberValue(row.step_quantity),
-            list_price: numberValue(row?.list_price),
+            list_price: row?.list_price === '' || row?.list_price == null ? null : numberValue(row.list_price),
             quantity: numberValue(row?.quantity),
             unit_cost: numberValue(row?.unit_cost),
             batch_code: String(row?.batch_code || '').trim(),
@@ -88,6 +98,7 @@ const previewImport = async (rows) => {
             expiry_date: row?.expiry_date || ''
         };
         if (!sku || sku.length > 100) errors.push('Thiếu SKU hoặc SKU quá dài');
+        if (data.image_url !== '' && !isImageUrl(data.image_url)) errors.push('Link ảnh cần là URL http:// hoặc https:// hợp lệ, tối đa 2.000 ký tự');
         if (
             !Number.isFinite(data.quantity) ||
             data.quantity <= 0 ||
@@ -95,6 +106,8 @@ const previewImport = async (rows) => {
         )
             errors.push('Số lượng phải dương, tối đa 3 chữ số thập phân');
         if (!Number.isSafeInteger(data.unit_cost) || data.unit_cost < 0) errors.push('Giá nhập phải là số nguyên không âm');
+        if (data.list_price != null && (!Number.isSafeInteger(data.list_price) || data.list_price < 0))
+            errors.push('Giá bán của lô phải là số nguyên không âm');
         if (!data.batch_code || data.batch_code.length > 100) errors.push('Thiếu mã lô hoặc mã lô quá dài');
         if (!parseDate(data.expiry_date) || data.expiry_date < today) errors.push('Hạn sử dụng không hợp lệ hoặc đã hết hạn');
         if (
@@ -118,7 +131,6 @@ const previewImport = async (rows) => {
                 data.category_id,
                 data.variant_name,
                 data.unit,
-                data.list_price,
                 data.step_quantity
             ]);
             if (newSkus.has(sku) && newSkus.get(sku) !== signature) errors.push('Thông tin SKU mới không thống nhất giữa các dòng');
@@ -129,7 +141,14 @@ const previewImport = async (rows) => {
         if (batches.has(batchKey) && batches.get(batchKey) !== dates)
             errors.push('Cùng mã lô nhưng ngày sản xuất hoặc hạn sử dụng khác nhau');
         batches.set(batchKey, dates);
+        if (data.list_price != null) {
+            if (batchPrices.has(batchKey) && batchPrices.get(batchKey) !== data.list_price)
+                errors.push('Cùng mã lô phải cùng giá bán');
+            batchPrices.set(batchKey, data.list_price);
+        }
         const existingStock = variant?.stocks.find((stock) => stock.batch_code === data.batch_code);
+        if (existingStock && data.list_price != null && data.list_price !== getLotPrice(variant, existingStock))
+            errors.push('Giá bán khác lô đã nhập; hãy dùng mã lô mới cho đợt giá khác');
         if (
             existingStock &&
             (existingStock.expiry_date.getTime() !== parseDate(data.expiry_date)?.getTime() ||
@@ -143,7 +162,9 @@ const previewImport = async (rows) => {
             unit: variant?.unit || data.unit,
             quantity: data.quantity,
             unit_cost: data.unit_cost,
+            list_price: data.list_price ?? (existingStock ? getLotPrice(variant, existingStock) : variant?.list_price ?? null),
             is_new: !variant,
+            image_url: typeof data.image_url === 'string' && isImageUrl(data.image_url) ? data.image_url : null,
             errors,
             data
         };
@@ -157,6 +178,7 @@ const previewImport = async (rows) => {
     };
 };
 
+// Đọc lại chứng từ nhập đã lưu để hiển thị kết quả và các dòng sản phẩm.
 const getReceipt = async (receiptId) => {
     if (!mongoose.isObjectIdOrHexString(receiptId)) throw new Error('RESOURCE_NOT_FOUND');
     const receipt = await GoodsReceipt.findById(receiptId).populate('created_by', 'full_name').populate('supplier_id', 'name').lean();
@@ -176,7 +198,9 @@ const getReceipt = async (receiptId) => {
     };
 };
 
+// Nhân viên gửi yêu cầu nhập chờ duyệt; admin được áp dụng theo luồng có kiểm tra dữ liệu.
 const confirmImport = async (userId, data) => {
+    if (!data.supplier_id) throw new Error('SUPPLIER_REQUIRED');
     if (
         typeof data.import_key !== 'string' ||
         !/^[a-zA-Z0-9-]{16,80}$/.test(data.import_key) ||

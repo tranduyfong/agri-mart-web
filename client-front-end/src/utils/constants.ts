@@ -21,11 +21,12 @@ export const ROUTES = {
 
 // Dùng chung cho các link từ thẻ sản phẩm và danh sách đã xem
 export const getProductDetailPath = (slug: string) => ROUTES.PRODUCT_DETAIL.replace(':slug', encodeURIComponent(slug));
+// Tạo liên kết kết quả từ mã lần đặt hàng.
 export const getOrderResultPath = (code: string) => ROUTES.ORDER_RESULT.replace(':code', encodeURIComponent(code));
 
 // Thông tin cửa hàng hiển thị trên thanh trên cùng
 export const STORE_INFO = {
-  name: 'AgriFood Smart',
+  name: 'Agri-Mart',
   address: 'Hà Nội, Việt Nam',
   openingHours: 'Mở cửa 07:00 - 21:00 mỗi ngày',
   phone: '0123 456 789',

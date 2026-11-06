@@ -1,15 +1,18 @@
+// Đọc và quản lý ưu đãi, phân biệt giảm giá tự động với mã khách cần nhập khi thanh toán.
 const Promotion = require('../models/promotion');
 const Product = require('../models/product');
 const mongoose = require('mongoose');
 const { escapeRegex } = require('../utils/string.util');
 const { getImageUrl } = require('../utils/file.util');
 
+// Tìm mã đang có để bước tính giảm kiểm tra thời gian và điều kiện áp dụng.
 const getCoupon = async (code, session = null) => {
     const promotion = await Promotion.findOne({ code: { $regex: '^' + escapeRegex(code.trim()) + '$', $options: 'i' } }).session(session);
     if (!promotion) throw new Error('COUPON_NOT_FOUND');
     return promotion;
 };
 
+// Lấy chương trình đang hiệu lực cho trang khách, có thể lọc riêng flash sale.
 const getActivePromotions = async ({ keyword, is_flash_sale }, pagination) => {
     const now = new Date();
     const query = {
@@ -50,6 +53,7 @@ const getActivePromotions = async ({ keyword, is_flash_sale }, pagination) => {
     };
 };
 
+// Lấy cả chương trình sắp chạy/đã kết thúc cho màn hình quản lý.
 const getManagePromotions = async (filters, pagination) => {
     const query = { promotion_scope: filters.scope === 'SHIPPING' ? 'SHIPPING' : 'PRODUCT' };
     const now = new Date();
@@ -75,6 +79,7 @@ const getManagePromotions = async (filters, pagination) => {
     };
 };
 
+// Đọc chi tiết chương trình để sửa hoặc xem các sản phẩm áp dụng.
 const getPromotion = async (id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const promotion = await Promotion.findById(id).lean();
@@ -82,6 +87,7 @@ const getPromotion = async (id) => {
     return { ...promotion, id: promotion._id.toString() };
 };
 
+// Kiểm tra thời gian, mức giảm, sản phẩm và ảnh rồi lưu chương trình/mã giảm.
 const savePromotion = async (id, data, files = []) => {
     const old = id ? await getPromotion(id) : null;
     if (
@@ -138,6 +144,7 @@ const savePromotion = async (id, data, files = []) => {
     return { id: (await Promotion.create(values))._id.toString() };
 };
 
+// Kết thúc chương trình theo luồng kiểm tra trạng thái hiện tại.
 const endPromotion = async (id) => {
     const item = await getPromotion(id);
     const now = new Date();

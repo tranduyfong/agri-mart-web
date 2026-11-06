@@ -1,3 +1,4 @@
+// Nút biểu tượng có thể kèm số lượng; dùng lại cho thao tác như giỏ hàng/yêu thích.
 import { Badge } from 'antd';
 import type { MouseEventHandler, ReactNode } from 'react';
 

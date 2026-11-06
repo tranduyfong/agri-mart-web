@@ -1,3 +1,4 @@
+// Gửi mật khẩu mới cùng email/OTP đã xác minh; thành công chuyển về đăng nhập.
 import { useState } from 'react';
 import { App, Form } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +22,7 @@ const ResetPasswordForm = ({ email, otp }: ResetPasswordFormProps) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Gửi email/OTP và mật khẩu mới tới backend, sau đó quay về đăng nhập.
   const handleSubmit = async (values: ResetPasswordFormValues) => {
     setIsSubmitting(true);
     try {

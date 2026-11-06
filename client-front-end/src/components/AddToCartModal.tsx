@@ -1,6 +1,9 @@
+// Hộp chọn quy cách/số lượng trước khi thêm sản phẩm vào giỏ; lượng chọn tuân theo bước bán và tồn hiện tại.
 import { useState } from 'react';
 import { Modal } from 'antd';
 import QuantitySelector from './QuantitySelector';
+import LotPriceDetails from './LotPriceDetails';
+import { quoteSaleLots } from '../utils/lotPricing';
 import type { ProductDetail, ProductVariant } from '../types/product';
 import { formatPrice } from '../utils/format';
 import { getFileUrl } from '../utils/fileUrl';
@@ -21,12 +24,15 @@ const AddToCartModal = ({ product, onClose }: AddToCartModalProps) => {
   const selected = product.variants.find((variant) => variant.id === variantId);
   const imageUrl = getFileUrl(product.images[0]?.url ?? null);
   const price = Math.round((selected?.list_price || 0) * (1 - (product.discount_percent || 0) / 100));
+  const quote = quoteSaleLots(selected, quantity, product.discount_percent || 0);
 
+  // Đổi quy cách thì tính lại lượng chọn theo bước bán và giới hạn tồn của quy cách mới.
   const selectVariant = (variant: ProductVariant) => {
     setVariantId(variant.id);
     setQuantity(normalizeQuantity(1, variant));
   };
 
+  // Gửi quy cách và số lượng qua luồng giỏ hàng dùng chung rồi đóng hộp khi thành công.
   const addToCart = async () => {
     if (!selected || quantity <= 0) return;
     const source = document.querySelector<HTMLElement>('.ant-modal .ant-btn-primary');
@@ -47,7 +53,8 @@ const AddToCartModal = ({ product, onClose }: AddToCartModalProps) => {
         </div>
       </fieldset>
       {selected && <div className="mt-5"><p className="mb-2 text-sm font-semibold">Số lượng</p><QuantitySelector value={quantity} step={getQuantityStep(selected)} max={getMaxQuantity(selected)} unit={selected.unit} disabled={isBusy} onChange={(value) => setQuantity(normalizeQuantity(value, selected))} /></div>}
-      <div className="mt-5 flex justify-between border-t border-gray-100 pt-4"><span>Tạm tính</span><strong className="text-lg text-primary">{formatPrice(price * quantity)}</strong></div>
+      <LotPriceDetails parts={quote.parts} unit={selected?.unit || ''} />
+      <div className="mt-5 flex justify-between border-t border-gray-100 pt-4"><span>Tạm tính</span><strong className="text-lg text-primary">{formatPrice(quote.total)}</strong></div>
     </Modal>
   );
 };

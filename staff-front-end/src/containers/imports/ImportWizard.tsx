@@ -1,6 +1,7 @@
+// Ba bước nhập hàng: đọc Excel/CSV, xem lỗi từng dòng và gửi phiếu/yêu cầu nhập bằng khóa chống trùng.
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, App, Button, Form, Input, Select, Steps, Table, Tag, Upload } from 'antd';
+import { Alert, App, Button, Form, Image, Input, Select, Steps, Table, Tag, Upload } from 'antd';
 import { InboxOutlined, DownloadOutlined } from '@ant-design/icons';
 import useAuth from '../../hooks/useAuth';
 import useData from '../../hooks/useData';
@@ -10,6 +11,7 @@ import Panel from '../../components/Panel';
 import PageHeader from '../../components/PageHeader';
 import StatCard from '../../components/StatCard';
 import LoadingCard from '../../components/LoadingCard';
+import ImportRowEditor from './ImportRowEditor';
 import { readImportFile, downloadImportTemplate } from '../../utils/importFile';
 import { getErrorMessage } from '../../utils/errorMessage';
 import { formatDate, formatPrice } from '../../utils/format';
@@ -41,12 +43,16 @@ const ImportWizard = () => {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [pendingRequest, setPendingRequest] = useState<string | null>(null);
+  const [editingRow, setEditingRow] = useState<number | null>(null);
+  const [previewDirty, setPreviewDirty] = useState(false);
   const busyRef = useRef(false);
   const { message } = App.useApp();
+  // Lưu lựa chọn và dữ liệu đang nhập để các bước của wizard dùng chung bản nháp.
   const updateDraft = (value: Draft) => {
     setDraft(value);
     sessionStorage.setItem(storageKey, JSON.stringify(value));
   };
+  // Đọc Excel/CSV, chuẩn hóa cột và đưa các dòng vào trạng thái chờ kiểm tra.
   const loadFile = async (file: File) => {
     if (busyRef.current) return false;
     busyRef.current = true;
@@ -64,13 +70,19 @@ const ImportWizard = () => {
     }
     return false;
   };
+  // Gửi từng dòng cho API xem trước để nhận lỗi và thống kê; chưa nhập hàng ở bước này.
   const check = async () => {
     if (busyRef.current) return;
+    if (!draft.supplierId) {
+      setError('Vui lòng chọn nhà cung cấp trước khi kiểm tra nhập hàng.');
+      return;
+    }
     busyRef.current = true;
     setBusy(true);
     setError('');
     try {
       setPreview(await inventoryService.previewImport(draft.rows));
+      setPreviewDirty(false);
       setStep(1);
     } catch (reason) {
       setError(getErrorMessage(reason));
@@ -79,8 +91,35 @@ const ImportWizard = () => {
       busyRef.current = false;
     }
   };
+  const saveRow = async (row: ImportRow) => {
+    if (editingRow === null || busyRef.current) return;
+    const rows = draft.rows.map((item, index) => index === editingRow - 2 ? row : item);
+    updateDraft({ ...draft, rows, importKey: crypto.randomUUID() });
+    setPreviewDirty(true);
+    setBusy(true);
+    busyRef.current = true;
+    setError('');
+    try {
+      setPreview(await inventoryService.previewImport(rows));
+      setPreviewDirty(false);
+      setEditingRow(null);
+      message.success('Đã lưu dòng và kiểm tra lại toàn bộ dữ liệu');
+    } catch (reason) {
+      const text = getErrorMessage(reason);
+      setError(text);
+      message.error(text);
+    } finally {
+      setBusy(false);
+      busyRef.current = false;
+    }
+  };
+  // Dùng các dòng đã kiểm tra và khóa yêu cầu để ghi nhận/gửi duyệt một lần, tránh nhập lặp.
   const confirm = async () => {
-    if (busyRef.current || !preview || preview.error_rows) return;
+    if (busyRef.current || !preview || preview.error_rows || previewDirty) return;
+    if (!draft.supplierId) {
+      setError('Vui lòng chọn nhà cung cấp trước khi gửi phiếu nhập.');
+      return;
+    }
     busyRef.current = true;
     setBusy(true);
     setError('');
@@ -134,18 +173,22 @@ const ImportWizard = () => {
             <Panel title="Thông tin phiếu nhập">
               <Form layout="vertical">
                 <div className="grid gap-x-6 sm:grid-cols-2">
-                  <Form.Item label="Nhà cung cấp">
+                  <Form.Item label="Nhà cung cấp" required>
                     <Select
-                      allowClear
+                      showSearch
+                      optionFilterProp="label"
                       value={draft.supplierId}
                       disabled={busy}
-                      placeholder="Không chọn nhà cung cấp"
+                      placeholder="Chọn nhà cung cấp (bắt buộc)"
                       options={lookups.suppliers.map((item) => ({
                         value: item.id,
                         label: item.code + ' · ' + item.name,
                       }))}
-                      onChange={(supplierId) => updateDraft({ ...draft, supplierId })}
+                      onChange={(supplierId) => updateDraft({ ...draft, supplierId, importKey: crypto.randomUUID() })}
                     />
+                    {!lookups.suppliers.length && (
+                      <p className="mt-2 text-sm text-muted">Chưa có nhà cung cấp. Vui lòng nhờ quản trị viên thêm trước khi nhập hàng.</p>
+                    )}
                   </Form.Item>
                 </div>
                 <Form.Item className="mb-0!" label="Ghi chú phiếu nhập">
@@ -154,7 +197,7 @@ const ImportWizard = () => {
                     maxLength={1000}
                     value={draft.note}
                     disabled={busy}
-                    onChange={(event) => updateDraft({ ...draft, note: event.target.value })}
+                    onChange={(event) => updateDraft({ ...draft, note: event.target.value, importKey: crypto.randomUUID() })}
                   />
                 </Form.Item>
               </Form>
@@ -177,6 +220,14 @@ const ImportWizard = () => {
                 Giá dùng số nguyên không có dấu phân cách hàng nghìn. Ngày dùng YYYY-MM-DD hoặc DD/MM/YYYY. SKU mới cần
                 thông tin danh mục, tên, quy cách và giá bán.
               </p>
+              <p className="mt-2 text-sm text-muted">
+                Cột Ảnh / Link ảnh / image_url không bắt buộc. Mỗi ô điền một link ảnh trực tiếp http(s) hoặc để trống.
+                Có link thì bổ sung ảnh sau khi duyệt; bỏ trống giữ nguyên ảnh hiện có.
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                Cùng quy cách dùng một SKU, mỗi đợt hàng dùng mã lô riêng. Cột Giá bán / list_price là giá của lô đó;
+                bỏ trống với SKU đã có thì dùng giá mặc định. Lô gần hết hạn được bán trước.
+              </p>
             </Panel>
             <Alert
               type="warning"
@@ -190,7 +241,7 @@ const ImportWizard = () => {
               >
                 Tải file mẫu
               </Button>
-              <Button type="primary" loading={busy} disabled={!draft.rows.length} onClick={check}>
+              <Button type="primary" loading={busy} disabled={!draft.rows.length || !draft.supplierId} onClick={check}>
                 Kiểm tra dữ liệu
               </Button>
             </div>
@@ -201,17 +252,28 @@ const ImportWizard = () => {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Tổng số dòng" value={preview.total_rows} hint="Đã đọc từ file" />
               <StatCard label="Hợp lệ" value={preview.valid_rows} hint="Sẵn sàng nhập" />
-              <StatCard label="Cần sửa" value={preview.error_rows} hint="Sửa file rồi tải lại" />
+              <StatCard label="Cần sửa" value={preview.error_rows} hint="Chỉnh sửa trực tiếp từng dòng" />
               <StatCard label="SKU mới" value={preview.new_skus} hint="Sản phẩm mới được tạo nháp" />
             </div>
             <Panel title="Kết quả kiểm tra">
+              <Form layout="vertical">
+                <Form.Item label="Nhà cung cấp" required>
+                  <Select className="max-w-lg" showSearch optionFilterProp="label" disabled={busy}
+                    value={draft.supplierId} placeholder="Chọn nhà cung cấp (bắt buộc)"
+                    options={lookups.suppliers.map((item) => ({ value: item.id, label: item.code + ' · ' + item.name }))}
+                    onChange={(supplierId) => updateDraft({ ...draft, supplierId, importKey: crypto.randomUUID() })} />
+                </Form.Item>
+              </Form>
+              {previewDirty && <Alert className="mb-4" type="warning" showIcon
+                title="Bản nháp đã thay đổi. Hãy kiểm tra lại trước khi gửi duyệt."
+                action={<Button disabled={busy} onClick={check}>Kiểm tra lại</Button>} />}
               <Table
                 rowKey="row_number"
                 dataSource={preview.rows}
-                scroll={{ x: 850 }}
+                scroll={{ x: 1300 }}
                 pagination={{ pageSize: 10, showSizeChanger: false }}
                 columns={[
-                  { title: 'Dòng', dataIndex: 'row_number' },
+                  { title: 'Dòng', dataIndex: 'row_number', width: 60 },
                   {
                     title: 'SKU / Sản phẩm',
                     render: (_, row) => (
@@ -222,15 +284,30 @@ const ImportWizard = () => {
                     ),
                   },
                   {
+                    title: 'Lô / Hạn sử dụng',
+                    width: 180,
+                    render: (_, row) => (
+                      <div>
+                        <p className="font-medium">HSD: {formatDate(String(row.data.expiry_date || ''))}</p>
+                        <p className="mt-1 text-sm text-muted">{row.data.batch_code || '—'}</p>
+                        {!!row.data.manufactured_date && (
+                          <p className="mt-1 text-xs text-muted">NSX: {formatDate(String(row.data.manufactured_date))}</p>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
                     title: 'Số lượng / ĐVT',
                     render: (_, row) =>
                       `${Number.isFinite(row.quantity) ? row.quantity.toLocaleString('vi-VN') : '—'} ${row.unit}`,
                   },
                   {
-                    title: 'Giá nhập',
+                    title: 'Giá vốn / đơn vị',
                     dataIndex: 'unit_cost',
                     render: (value: number) => (Number.isFinite(value) ? formatPrice(value) : '—'),
                   },
+                  { title: 'Giá niêm yết lô / đơn vị', dataIndex: 'list_price',
+                    render: (value: number | null) => value == null ? 'Giá mặc định' : formatPrice(value) },
                   {
                     title: 'Kết quả',
                     render: (_, row) =>
@@ -243,6 +320,22 @@ const ImportWizard = () => {
                       ) : (
                         <Tag color={row.is_new ? 'gold' : 'green'}>{row.is_new ? 'Mới · tạo nháp' : 'Hợp lệ'}</Tag>
                       ),
+                  },
+                  {
+                    title: 'Ảnh bổ sung',
+                    dataIndex: 'image_url',
+                    width: 110,
+                    render: (url: string | null) => url ? (
+                      <Image src={url} alt="Ảnh nhập từ file" width={52} height={52} style={{ objectFit: 'contain' }} />
+                    ) : 'Không bổ sung',
+                  },
+                  {
+                    title: 'Thao tác', fixed: 'right', width: 120,
+                    render: (_, row) => (
+                      <Button type="link" className="px-0!" disabled={busy} onClick={() => setEditingRow(row.row_number)}>
+                        Chỉnh sửa
+                      </Button>
+                    ),
                   },
                 ]}
               />
@@ -262,7 +355,7 @@ const ImportWizard = () => {
               <Button disabled={busy} onClick={() => setStep(0)}>
                 Chọn lại file / sửa thông tin
               </Button>
-              <Button type="primary" disabled={!!preview.error_rows} loading={busy} onClick={confirm}>
+              <Button type="primary" disabled={!!preview.error_rows || previewDirty || !draft.supplierId} loading={busy} onClick={confirm}>
                 {user?.role === 'ADMIN' ? 'Xác nhận nhập kho' : 'Gửi duyệt phiếu nhập'}
               </Button>
             </div>
@@ -345,6 +438,11 @@ const ImportWizard = () => {
           </>
         )}
         {error && <Alert type="error" showIcon title={error} />}
+        {editingRow !== null && preview && (
+          <ImportRowEditor key={editingRow} row={draft.rows[editingRow - 2]}
+            checked={preview.rows[editingRow - 2]} categories={lookups.categories} busy={busy}
+            onSave={saveRow} onCancel={() => setEditingRow(null)} />
+        )}
       </div>
     </>
   );

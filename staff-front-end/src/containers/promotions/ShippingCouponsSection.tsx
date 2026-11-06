@@ -1,3 +1,4 @@
+// Quản lý mã giảm phí giao bằng form khuyến mãi dùng chung, giới hạn phạm vi ưu đãi phù hợp.
 import { useState } from 'react';
 import PageHeader from '../../components/PageHeader';
 import PromotionListSection from './PromotionListSection';
@@ -5,6 +6,7 @@ import PromotionFormSection from './PromotionFormSection';
 const ShippingCouponsSection = () => {
   const [editingId, setEditingId] = useState<string>(),
     [revision, setRevision] = useState(0);
+  // Kết thúc lần sửa mã hiện tại và đổi revision để danh sách/form lấy lại dữ liệu.
   const finished = () => {
     setEditingId(undefined);
     setRevision((value) => value + 1);

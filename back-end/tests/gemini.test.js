@@ -16,6 +16,9 @@ test('Gemini dùng key ở header backend, JSON schema và timeout; không có q
         assert.equal(body.generationConfig.responseMimeType, 'application/json');
         assert.equal(body.tools, undefined);
         assert.ok(!options.body.includes(process.env.GEMINI_API_KEY));
+        assert.match(body.systemInstruction.parts[0].text, /Ngân sách thấp/);
+        assert.match(body.systemInstruction.parts[0].text, /không chẩn đoán/i);
+        assert.match(body.systemInstruction.parts[0].text, /food_guidance/);
         return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ scope: 'STORE', answer: 'Chào bạn', recommendations: [] }) }] } }] });
     };
     assert.equal((await gemini.generateReply({ catalog: [], history: [] })).answer, 'Chào bạn');

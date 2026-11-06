@@ -1,7 +1,9 @@
+// Phiếu nhập là chứng từ ghi số lượng, giá nhập và hạn dùng của từng lô; dùng để đối chiếu kho và tính giá vốn.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const goodsReceiptSchema = new Schema({
+    // Khóa chống nhập lặp cho cùng người tạo; source_file giữ tên file để tra lại chứng từ.
     import_key: {
         type: String,
         default: null
@@ -35,6 +37,7 @@ const goodsReceiptSchema = new Schema({
         default: ''
     },
 
+    // Mỗi dòng lưu SKU/lô, lượng và giá nhập; tên/đơn vị được chụp lại để lịch sử vẫn đọc được.
     items: [
         {
             product_id: {
@@ -94,6 +97,7 @@ const goodsReceiptSchema = new Schema({
 });
 
 goodsReceiptSchema.index({ created_at: -1 });
+goodsReceiptSchema.index({ supplier_id: 1, created_at: -1 });
 goodsReceiptSchema.index({ created_by: 1, import_key: 1 }, {
     unique: true,
     partialFilterExpression: { import_key: { $type: 'string' } }

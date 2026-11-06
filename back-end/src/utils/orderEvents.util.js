@@ -1,3 +1,4 @@
+// Báo danh sách đơn thay đổi cho các Socket có quyền quản lý đơn hàng.
 const socketConfig = require('../configs/socket.config');
 
 // Chỉ gọi sau khi giao dịch DB thành công. Sự kiện không chứa dữ liệu khách hàng.

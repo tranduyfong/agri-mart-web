@@ -17,6 +17,7 @@ export const formatPrice = (price: number) => {
 // Định dạng ngày, VD: "2026-10-20T10:00:00.000Z" -> "20/10/2026"
 export const formatDate = (dateText: string) => {
   const date = new Date(dateText);
+  if (!Number.isFinite(date.getTime())) return '—';
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   return `${day}/${month}/${date.getFullYear()}`;

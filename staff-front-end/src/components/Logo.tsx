@@ -1,15 +1,9 @@
+// Logo/liên kết về màn hình chính, dùng lại ở các phần bố cục.
 import { Link } from 'react-router-dom';
+import logo from '../assets/images/agri-mart-logo.png';
 const Logo = () => (
-  <Link to="/" className="inline-flex items-center gap-3 text-xl font-semibold text-primary">
-    <svg width="27" height="27" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <path
-        d="M10 28C8 14 18 10 31 9c-1 13-5 23-18 20m-3 3 16-17"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-    Agri-Mart
+  <Link to="/" className="inline-flex shrink-0 items-center" aria-label="Agri-Mart · Trang chủ">
+    <img src={logo} alt="Agri-Mart" width={2172} height={724} className="h-auto w-48 max-w-full object-contain" />
   </Link>
 );
 export default Logo;

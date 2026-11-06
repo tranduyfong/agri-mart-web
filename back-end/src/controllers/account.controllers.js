@@ -1,9 +1,11 @@
+// Nhận request của nhóm hồ sơ, sổ địa chỉ và mật khẩu, kiểm tra đầu vào và gọi service; successResponse/errorResponse
+// thống nhất dữ liệu trả cho frontend.
 const mongoose = require('mongoose');
 const accountService = require('../services/account.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
+const { PHONE_PATTERN, isValidAddress } = require('../utils/validation.util');
 
-const PHONE_PATTERN = /^(0|\+84)[35789]\d{8}$/;
-
+// Trả thông tin tài khoản; phạm vi người được xem được xác định từ phiên/route hiện tại.
 const getAccount = async (req, res) => {
     try {
         const user = await accountService.getProfile(req.user.userId);
@@ -17,6 +19,7 @@ const getAccount = async (req, res) => {
     }
 };
 
+// Kiểm tra họ tên/số điện thoại rồi gửi dữ liệu đã lọc cho service cập nhật hồ sơ.
 const updateProfile = async (req, res) => {
     try {
         const { full_name, phone } = req.body || {};
@@ -45,6 +48,7 @@ const updateProfile = async (req, res) => {
     }
 };
 
+// Trả sổ địa chỉ của chính tài khoản đang đăng nhập.
 const getAddresses = async (req, res) => {
     try {
         const addresses = await accountService.getAddresses(req.user.userId);
@@ -54,6 +58,7 @@ const getAddresses = async (req, res) => {
     }
 };
 
+// Trả địa chỉ đã chọn làm mặc định để giao diện có thể tự điền.
 const getDefaultAddress = async (req, res) => {
     try {
         const address = await accountService.getDefaultAddress(req.user.userId);
@@ -63,27 +68,14 @@ const getDefaultAddress = async (req, res) => {
     }
 };
 
+// Kiểm tra các phần địa chỉ, người nhận và ID trước khi nhờ service thêm/sửa địa chỉ.
 const saveAddress = async (req, res) => {
     try {
         const { recipient_name, phone, province_code, ward_code, street_address = '', hamlet = '', is_default = false } = req.body || {};
 
         if (
             (req.params.id && !mongoose.isObjectIdOrHexString(req.params.id)) ||
-            typeof recipient_name !== 'string' ||
-            !recipient_name.trim() ||
-            recipient_name.trim().length > 150 ||
-            typeof phone !== 'string' ||
-            !PHONE_PATTERN.test(phone.trim()) ||
-            !/^\d+$/.test(String(province_code)) ||
-            Number(province_code) <= 0 ||
-            !/^\d+$/.test(String(ward_code)) ||
-            Number(ward_code) <= 0 ||
-            typeof street_address !== 'string' ||
-            street_address.trim().length > 300 ||
-            typeof hamlet !== 'string' ||
-            hamlet.trim().length > 150 ||
-            (!street_address.trim() && !hamlet.trim()) ||
-            typeof is_default !== 'boolean'
+            !isValidAddress(req.body || {})
         ) {
             return errorResponse(res, 'VALIDATION_FAILED', 'Tên người nhận, số điện thoại hoặc địa chỉ không hợp lệ', 400);
         }
@@ -115,6 +107,7 @@ const saveAddress = async (req, res) => {
     }
 };
 
+// Kiểm tra ID rồi yêu cầu đổi địa chỉ mặc định trong sổ của người đăng nhập.
 const setDefaultAddress = async (req, res) => {
     try {
         if (!mongoose.isObjectIdOrHexString(req.params.id)) {
@@ -134,6 +127,7 @@ const setDefaultAddress = async (req, res) => {
     }
 };
 
+// Xóa theo ID sau khi kiểm tra định dạng và quyền sở hữu ở service.
 const removeAddress = async (req, res) => {
     try {
         if (!mongoose.isObjectIdOrHexString(req.params.id)) {
@@ -153,6 +147,7 @@ const removeAddress = async (req, res) => {
     }
 };
 
+// Kiểm tra mật khẩu cũ/mới/nhập lại; đổi thành công yêu cầu người dùng đăng nhập lại.
 const changePassword = async (req, res) => {
     try {
         const { current_password, new_password, confirm_password } = req.body || {};

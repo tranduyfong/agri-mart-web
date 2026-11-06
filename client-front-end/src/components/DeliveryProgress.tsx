@@ -1,3 +1,4 @@
+// Hiển thị các bước xử lý/giao hàng từ trạng thái đơn, dùng chung khi theo dõi tiến độ.
 import { Steps, Tag } from 'antd';
 import { CheckCircleOutlined, InboxOutlined, ShoppingOutlined, TruckOutlined } from '@ant-design/icons';
 import { ORDER_STATUSES } from '../utils/orderStatus';

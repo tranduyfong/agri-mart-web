@@ -1,3 +1,4 @@
+// Đổi mã trạng thái backend thành nhãn tiếng Việt và màu để hiển thị nhất quán.
 import { Tag } from 'antd';
 const LABELS: Record<string, [string, string]> = {
   ACTIVE: ['Hoạt động', 'green'],

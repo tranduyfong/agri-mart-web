@@ -1,3 +1,4 @@
+// Quy tắc khi chạy npm run lint: kiểm tra TypeScript/React Hooks và bỏ qua thư mục build dist.
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

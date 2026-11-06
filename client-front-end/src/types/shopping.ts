@@ -1,7 +1,11 @@
+// Kiểu giỏ hàng/yêu thích, thao tác cập nhật và lỗi có thể gặp khi phiên đăng nhập thay đổi.
 import type { ProductListItem } from './product';
+import type { LotPricePart } from '../utils/lotPricing';
 
 // Một dòng giỏ hàng ứng với một quy cách bán
 export interface CartItem {
+  line_total?: number;
+  price_breakdown?: LotPricePart[];
   id: string;
   product_id: string;
   name: string;

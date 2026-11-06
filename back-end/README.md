@@ -140,6 +140,8 @@ Chạy `npm run test:staff` để kiểm tra trên MongoDB tạm và SMTP giả.
 
 **Duyệt sản phẩm:** thao tác thêm/sửa sản phẩm hoặc nhập hàng của STAFF tạo `ProductChange` chờ duyệt, trả HTTP 202 cùng `{ request_id, status }`. Chưa ghi Product/GoodsReceipt hay cộng tồn. ADMIN vào mục **Duyệt sản phẩm** để so sánh trước/sau hoặc xem từng dòng nhập, chấp nhận hoặc từ chối kèm lý do. STAFF xem các yêu cầu của mình ở mục **Yêu cầu sản phẩm**. Danh sách tự cập nhật mỗi 10 giây.
 
+**Một SKU, nhiều lô khác giá:** `Product.variants[].stocks[].list_price` lưu giá bán theo lô; giá của SKU là giá mặc định khi nhập thiếu giá hoặc đọc dữ liệu cũ. Dùng cùng SKU, khác `batch_code` cho cùng quy cách. `productStock.util.js` dùng FEFO để báo giá và phân bổ lượng theo từng lô còn hạn. Giỏ/đơn vẫn một dòng SKU, có `price_breakdown`, `line_subtotal` và `line_total`; coupon tính trên tổng các lô. Đơn lưu giá từng lô trong `stock_allocations` để lịch sử, giá vốn và hoàn kho không bị ảnh hưởng bởi việc sửa giá sau này. Dữ liệu cũ chưa có giá lô hoặc tổng dòng vẫn được đọc theo giá SKU/đơn cũ. Nhân viên sửa `lot_prices` qua API sửa sản phẩm vẫn phải được admin duyệt.
+
 - `GET /admin/product-changes`, `GET /admin/product-changes/:id`, `PATCH /admin/product-changes/:id/review` với `{ status: 'APPROVED' | 'REJECTED', note }`.
 - `GET /staff/product-changes`, `GET /staff/product-changes/:id`: chỉ xem yêu cầu do chính tài khoản gửi.
 - Áp dụng cho cả `/staff/products`, `/staff/imports` và các API cũ `/product`, `/product/:id`, `/product/import`; không cho dùng đường dẫn cũ để bỏ qua xét duyệt.
@@ -188,10 +190,17 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 
 `src/configs/gemini.config.js` gọi API Google bằng `fetch` có timeout 45 giây và [JSON schema](https://ai.google.dev/gemini-api/docs/structured-output). `src/services/chatAi.services.js` đọc catalog, kiểm tra gợi ý và lưu tin AI. Không thêm collection hoặc thư viện AI mới.
 
-- AI chỉ tư vấn cửa hàng, chọn sản phẩm, bảo quản và cách mua hàng. Câu hỏi ngoài phạm vi được từ chối; yêu cầu người thật, xử lý đơn/khiếu nại, ảnh đính kèm hoặc lỗi Gemini chuyển sang chờ nhân viên. Nhân viên tiếp nhận thì AI dừng, kể cả đang chờ Google phản hồi.
+- AI tư vấn cửa hàng, chọn sản phẩm, món ăn và cách mua hàng. Phần giải thích của AI được giữ lại cùng thẻ gợi ý, không thay bằng câu trả lời cố định. Yêu cầu người thật, xử lý đơn/khiếu nại hoặc ảnh đính kèm có thể chuyển nhân viên. Lỗi Google chỉ báo tạm chưa tư vấn được, không khóa hội thoại vào chờ nhân viên. Khi người thật tiếp nhận, AI dừng kể cả đang chờ Google phản hồi.
+- `chatShopping.util.js` đọc ngân sách, số người và nhóm thực phẩm từ lịch sử khách (không lấy lời nhân viên làm yêu cầu). Giá gợi ý được tính lại theo lô. Nếu vượt ngân sách, AI được sửa một lần; vẫn vượt thì không hiển thị thẻ đặt hàng. Thiếu nhóm rau/thịt thì thông báo rõ, không tự coi một món là bữa ăn đầy đủ.
+- `foodGuidance.util.js` cung cấp hướng dẫn dinh dưỡng phổ thông có nguồn CDC/NIH cho đái tháo đường, tăng huyết áp, gout và bệnh thận. AI giải thích liên hệ giữa tình trạng đã nêu và lựa chọn thực phẩm, hỏi thêm dị ứng/chỉ định ăn kiêng khi cần. Không chẩn đoán, kê thuốc, khẳng định chữa bệnh, bịa hàm lượng dinh dưỡng hoặc hứa khẩu phần phù hợp cho mọi bệnh nhân. Bệnh thận và nhiều bệnh kèm cần thông tin từ chuyên gia điều trị trước khi cá nhân hóa.
+- Khách đang chờ nhân viên có nút **Tiếp tục với AI** (`POST /api/chat/:id/resume-ai`), chỉ áp dụng khi chưa có người thật tiếp nhận. Phòng cũ kẹt do lỗi kỹ thuật được mở lại khi khách gửi câu hỏi mua thực phẩm mới; yêu cầu gặp nhân viên đã ghi nhận vẫn được giữ cho tới khi khách chủ động quay lại AI.
 - Chỉ gửi lịch sử chữ gần nhất và catalog công khai sang Google; không gửi hồ sơ khách, sổ địa chỉ, đơn hàng, ảnh hoặc giá nhập. Không có công cụ cho AI tự tạo/duyệt đơn hay thanh toán.
 - Gợi ý tối đa 5 quy cách còn bán, đủ lượng theo bước bán và lô chưa hết hạn. Giá áp dụng ưu đãi tự động giống checkout. ID do AI trả về phải thuộc catalog đã gửi; tồn được đọc lại trước khi lưu và mỗi lần hiển thị thẻ. Thẻ cũ hết hàng/ngừng bán bị khóa đặt.
 - Khách đặt từng món hoặc cả nhóm bằng `buy_now` (một object như trước hoặc mảng 1–5 `{ variant_id, quantity }` khác nhau). Preview và đặt đơn đều tính lại giá/kho; trừ kho trong transaction, một phí giao, không sửa giỏ hàng. Vẫn phải chọn địa chỉ, xác nhận đặt và chờ nhân viên duyệt.
 - Hàng đợi lưu `ai_pending` và thời hạn khóa trên `ChatRoom`; kiểm tra mỗi 3 giây, tối đa 2 yêu cầu Google đồng thời trên mỗi tiến trình. `reply_to` duy nhất ngăn trả lời lặp; câu hỏi mới đến trong lúc AI soạn sẽ thay thế câu cũ. Khởi động lại tiếp tục các yêu cầu đang chờ sau khi khóa cũ hết hạn.
 
 Đặt `GEMINI_ENABLED=false` để chỉ dùng nhân viên. Chạy `npm run test:ai` để kiểm thử Gemini giả và DB tạm, gồm tồn hết hạn, giá ưu đãi, ID/số lượng sai, chuyển nhân viên, lỗi Google, câu hỏi mới và checkout nhiều món. `npm test` kiểm tra thêm cấu hình/schema API; các bài tự động không gọi Google thật.
+
+### Nhà cung cấp
+
+Admin dùng `GET/POST /api/admin/suppliers`, `GET/PUT /api/admin/suppliers/:id` và `GET /api/admin/suppliers/:id/items`. Có tìm kiếm, phân trang, mã duy nhất, xem/sửa tên và số liên hệ. Thống kê lấy từ `GoodsReceipt` đã ghi nhận: số phiếu, tổng giá trị nhập và lượng từng SKU/đơn vị. Phiếu đang chờ admin duyệt chưa cộng số liệu. Đây là giá trị hàng nhập theo chứng từ, chưa phải hệ thống công nợ/thanh toán nhà cung cấp. Không có API xóa để giữ liên kết lịch sử nhập hàng.

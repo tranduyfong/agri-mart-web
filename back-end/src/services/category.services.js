@@ -1,3 +1,4 @@
+// Tra cứu và lưu danh mục, bao gồm ảnh upload hoặc URL ảnh do người quản lý nhập.
 const Category = require('../models/category');
 const Product = require('../models/product');
 const mongoose = require('mongoose');
@@ -5,6 +6,7 @@ const slugify = require('slugify');
 const { normalizeSearch } = require('../utils/string.util');
 const { getImageUrl } = require('../utils/file.util');
 
+// Lấy danh mục kèm dữ liệu phục vụ màn hình hiện tại, như ảnh và số sản phẩm.
 const getCategories = async (keyword, pagination) => {
     // Danh mục nhỏ: chuẩn hóa dấu để hỗ trợ tìm tên tiếng Việt không dấu.
     const candidates = await Category.find({}).sort({ _id: 1 }).lean();
@@ -37,6 +39,7 @@ const getCategories = async (keyword, pagination) => {
     };
 };
 
+// Lưu tên, slug và ảnh của danh mục; tên ảnh có thể đến từ upload hoặc URL.
 const saveCategory = async (id, data, files = []) => {
     if (typeof data.name !== 'string' || !data.name.trim() || data.name.length > 150) throw new Error('INVALID_DATA');
     const slug = data.slug || slugify(data.name, { lower: true, strict: true, locale: 'vi' });

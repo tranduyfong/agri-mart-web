@@ -1,3 +1,4 @@
+// Form địa chỉ với dropdown tỉnh/phường xã; lưu thêm thôn/xóm và địa chỉ chi tiết.
 import { useState } from 'react';
 import { Alert, App, Button, Checkbox, Form, Input, Modal, Select } from 'antd';
 import { EnvironmentOutlined, ReloadOutlined } from '@ant-design/icons';
@@ -17,6 +18,7 @@ interface AddressFormModalProps {
   handleError: (error: unknown) => void;
 }
 
+// Bỏ dấu/chuyển chữ thường để tìm trong các lựa chọn địa chỉ.
 const normalizeSearch = (value: string) => {
   return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[đĐ]/g, 'd').toLowerCase();
 };
@@ -51,6 +53,7 @@ const AddressFormModal = ({ address, onClose, user, addresses, onAddressesUpdate
     selectedProvince?.name,
   ].filter(Boolean).join(', ');
 
+  // Ghép mã tỉnh/xã và địa chỉ chi tiết thành payload; chỉ cập nhật giao diện sau khi backend lưu thành công.
   const handleSubmit = async (values: AddressFormValues) => {
     setIsSubmitting(true);
 
@@ -75,6 +78,7 @@ const AddressFormModal = ({ address, onClose, user, addresses, onAddressesUpdate
     }
   };
 
+  // So khớp từ tìm với nhãn dropdown theo cách không phụ thuộc dấu tiếng Việt.
   const filterOption = (input: string, option?: { label: string }) => {
     return normalizeSearch(option?.label ?? '').includes(normalizeSearch(input));
   };

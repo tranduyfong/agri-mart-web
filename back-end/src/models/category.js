@@ -1,3 +1,4 @@
+// Danh mục nhóm các sản phẩm và lưu trực tiếp URL ảnh đại diện.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

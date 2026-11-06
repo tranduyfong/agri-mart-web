@@ -1,3 +1,4 @@
+// Thẻ khuyến mãi có ảnh phủ khung, mức giảm và thời gian; bấm để xem sản phẩm thuộc chương trình.
 import { Link } from 'react-router-dom';
 import type { Promotion } from '../types/promotion';
 import { ROUTES } from '../utils/constants';
@@ -44,9 +45,9 @@ const PromotionCard = ({ promotion }: PromotionCardProps) => {
           <p>
             {formatDate(promotion.valid_from)} - {formatDate(promotion.valid_to)}
           </p>
-          <p className="mt-0.5">
+          {isCoupon && <p className="mt-0.5">
             Mã: <span className="font-bold text-white">{promotion.code}</span>
-          </p>
+          </p>}
         </div>
 
         <Link

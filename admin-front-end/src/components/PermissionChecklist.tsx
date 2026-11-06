@@ -1,3 +1,4 @@
+// Danh sách checkbox các nhóm quyền; lưu mã quyền thay vì nội dung nhãn hiển thị.
 import { Checkbox } from 'antd';
 import type { Permission } from '../types/admin';
 const PermissionChecklist = ({

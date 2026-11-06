@@ -1,8 +1,10 @@
+// Tóm tắt các sản phẩm, ưu đãi, phí giao và tổng tiền do backend trả về.
 import type { ReactNode } from 'react';
 import { EnvironmentOutlined, SafetyCertificateOutlined, ShoppingOutlined, TruckOutlined } from '@ant-design/icons';
 import { getFileUrl } from '../../utils/fileUrl';
 import { formatPrice } from '../../utils/format';
 import type { CheckoutSummary } from '../../types/order';
+import LotPriceDetails from '../../components/LotPriceDetails';
 
 interface OrderSummaryProps {
   summary: CheckoutSummary;
@@ -27,6 +29,7 @@ const OrderSummary = ({ summary, address, children, couponInput }: OrderSummaryP
             <p className="text-xs text-gray-400">{item.category_name}</p>
             <h3 className="mt-1 text-sm font-bold text-gray-900">{item.name}</h3>
             <p className="mt-1 text-xs text-gray-500">{item.variant_name} · {item.quantity.toLocaleString('vi-VN')} {item.unit}</p>
+            <LotPriceDetails parts={item.price_breakdown} unit={item.unit} />
             <p className="mt-2 text-sm font-bold text-gray-900">{formatPrice(item.line_total)}</p>
           </div>
           <span className="shrink-0 text-sm font-medium text-gray-500">×{item.quantity.toLocaleString('vi-VN')}</span>

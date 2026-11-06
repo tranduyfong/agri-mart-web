@@ -1,3 +1,4 @@
+// Tổng quan công việc nhân viên: số đơn chờ, tồn sắp hết hạn và những đơn cần xử lý.
 import { Alert, Button } from 'antd';
 import { Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';

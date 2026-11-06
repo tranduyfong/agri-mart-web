@@ -1,3 +1,4 @@
+// Ô nhập dùng lại trong Form.Item để các form thống nhất label, placeholder và validation.
 import { Form, Input } from 'antd';
 import type { Rule } from 'antd/es/form';
 

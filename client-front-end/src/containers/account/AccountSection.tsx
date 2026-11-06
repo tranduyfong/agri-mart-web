@@ -1,3 +1,4 @@
+// Bố cục tài khoản khách hàng: tải hồ sơ/sổ địa chỉ và chia dữ liệu cho các tab con.
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Result, Skeleton } from 'antd';
@@ -14,6 +15,7 @@ const AccountSection = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Đổi tab tài khoản thì cập nhật vị trí cuộn để phần form mới được nhìn thấy.
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [location.pathname]);
 
   return (

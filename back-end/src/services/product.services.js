@@ -1,3 +1,4 @@
+// Nghiệp vụ sản phẩm: tìm kiếm/gợi ý, quy cách bán, ảnh, kiểm tra dữ liệu nhập và cập nhật tồn theo lô.
 const mongoose = require('mongoose');
 const slugify = require('slugify');
 const Product = require('../models/product');
@@ -9,16 +10,20 @@ const GoodsReceipt = require('../models/goodsReceipt');
 const { getSearchScore, getSearchSuggestion } = require('../utils/levenshtein.util');
 const { recommendProducts } = require('../utils/recommendation.util');
 const { getToday, parseDate } = require('../utils/date.util');
-const { availableStock } = require('../utils/productStock.util');
+const { availableStock, getVariantPrice, getLotPrice, getSaleLots } = require('../utils/productStock.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
 const { getAllocationCost } = require('../utils/report.util');
+const { isImageUrl } = require('../utils/validation.util');
 
+// Tái sử dụng transaction đang duyệt yêu cầu; chỉ tự mở transaction khi thao tác độc lập.
 const runTransaction = (session, work) => (session ? work(session) : mongoose.connection.transaction(work));
 
+// Tạo đường dẫn dễ đọc từ tên và mã để các sản phẩm tên giống nhau vẫn phân biệt.
 const createSlug = (name, code) => {
     return slugify(name + ' ' + code, { lower: true, strict: true, locale: 'vi' });
 };
 
+// Chỉ lấy giảm phần trăm tự động đang hiệu lực, không tự áp mã giảm khách phải nhập.
 const getProductDiscounts = async (productIds) => {
     const now = new Date();
     const promotions = await Promotion.find({
@@ -41,6 +46,7 @@ const getProductDiscounts = async (productIds) => {
     return discounts;
 };
 
+// Tìm/lọc sản phẩm, chấm điểm tìm gần đúng, tính tồn/ưu đãi/bán chạy rồi phân trang.
 const getProducts = async (filters, pagination) => {
     const query = {};
     if (filters.status) query.status = filters.status;
@@ -50,15 +56,15 @@ const getProducts = async (filters, pagination) => {
     }
     if (filters.product_ids) query._id = { $in: filters.product_ids };
 
-    // Khoảng giá phải khớp trong cùng một quy cách bán.
-    if (filters.min_price != null || filters.max_price != null) {
-        const price = {};
-        if (filters.min_price != null) price.$gte = filters.min_price;
-        if (filters.max_price != null) price.$lte = filters.max_price;
-        query.variants = { $elemMatch: { list_price: price } };
-    }
-
     let products = await Product.find(query).populate('category_id', 'name').lean();
+    // Lọc theo giá lô đang được ưu tiên bán, không theo giá mặc định của SKU.
+    if (filters.min_price != null || filters.max_price != null) {
+        products = products.filter((product) => product.variants.some((variant) => {
+            const price = getVariantPrice(variant);
+            return (filters.min_price == null || price >= filters.min_price) &&
+                (filters.max_price == null || price <= filters.max_price);
+        }));
+    }
     const searchScores = {};
     if (filters.keyword) {
         products = products.filter((product) => {
@@ -71,6 +77,7 @@ const getProducts = async (filters, pagination) => {
         });
     }
 
+    // Lấy ưu đãi/đơn hoàn tất để tính thông tin thẻ và sắp xếp bán chạy sau khi đã lọc sản phẩm.
     const productIds = products.map((product) => product._id);
     const now = new Date();
     const recentDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -97,7 +104,7 @@ const getProducts = async (filters, pagination) => {
         const offers = promotions.filter((promotion) => promotion.product_ids.some((value) => value.toString() === id));
         if (filters.on_sale && !offers.length) continue;
 
-        const variants = [...product.variants].sort((a, b) => a.list_price - b.list_price);
+        const variants = [...product.variants].sort((a, b) => getVariantPrice(a) - getVariantPrice(b));
         const percentOffers = offers.filter(
             (promotion) => promotion.discount_type === 'PERCENT' && promotion.promotion_scope === 'PRODUCT' && !promotion.requires_code
         );
@@ -113,8 +120,8 @@ const getProducts = async (filters, pagination) => {
             created_at: product.created_at,
             category_id: product.category_id?._id.toString() || null,
             category_name: product.category_id?.name || null,
-            min_price: variants[0]?.list_price ?? null,
-            max_price: variants[variants.length - 1]?.list_price ?? null,
+            min_price: variants.length ? getVariantPrice(variants[0]) : null,
+            max_price: variants.length ? getVariantPrice(variants[variants.length - 1]) : null,
             unit: variants[0]?.unit || null,
             total_stock: Math.round(stock * 1000) / 1000,
             thumbnail_url: product.images[0] || null,
@@ -142,6 +149,7 @@ const getProducts = async (filters, pagination) => {
     };
 };
 
+// Xếp các sản phẩm tương tự theo nội dung và loại chính sản phẩm đang xem.
 const getRelatedProducts = async (productId) => {
     if (!mongoose.isObjectIdOrHexString(productId)) throw new Error('PRODUCT_NOT_FOUND');
     productId = new mongoose.Types.ObjectId(productId).toString();
@@ -164,6 +172,7 @@ const getRelatedProducts = async (productId) => {
     return recommendations.map((product) => byId.get(product.id)).filter(Boolean);
 };
 
+// Ghép ảnh, quy cách, ưu đãi và tồn mới nhất thành chi tiết sản phẩm.
 const getProductDetail = async ({ id, slug, onlyPublished }) => {
     if (id !== undefined && !mongoose.isObjectIdOrHexString(id)) throw new Error('PRODUCT_NOT_FOUND');
 
@@ -193,13 +202,18 @@ const getProductDetail = async ({ id, slug, onlyPublished }) => {
             name: variant.name,
             unit: variant.unit,
             step_quantity: variant.step_quantity,
-            list_price: variant.list_price,
+            list_price: onlyPublished ? getVariantPrice(variant) : variant.list_price,
+            current_price: getVariantPrice(variant),
+            // Chỉ công khai giá, hạn và lượng của lô còn bán; không lộ giá vốn.
+            sale_lots: getSaleLots(variant).map((stock) => ({ batch_code: stock.batch_code,
+                quantity: stock.quantity, expiry_date: stock.expiry_date, list_price: getLotPrice(variant, stock) })),
             stock_quantity: availableStock(variant),
             ...(!onlyPublished
                 ? {
                       stock_lots: variant.stocks.map((stock) => ({
                           batch_code: stock.batch_code,
                           quantity: stock.quantity,
+                          list_price: getLotPrice(variant, stock),
                           expiry_date: stock.expiry_date,
                           unit_cost: getAllocationCost(stock, { product_id: product._id, variant_sku: variant.sku }, receipts, new Date())
                       }))
@@ -210,6 +224,7 @@ const getProductDetail = async ({ id, slug, onlyPublished }) => {
     };
 };
 
+// Chỉ lấy các trường quy cách cho phép sửa; không để payload tùy ý ghi vào stocks.
 const getVariantData = (variant) => {
     return {
         sku: variant.sku,
@@ -220,6 +235,7 @@ const getVariantData = (variant) => {
     };
 };
 
+// Kiểm tra SKU, giá, bước bán và điều kiện sản phẩm được đăng bán.
 const checkVariants = (product) => {
     if (product.status === 'PUBLISHED' && !product.variants.length) throw new Error('PRODUCT_HAS_NO_VARIANT');
     if (product.status === 'PUBLISHED' && !product.images.length) throw new Error('PRODUCT_HAS_NO_IMAGE');
@@ -232,6 +248,7 @@ const checkVariants = (product) => {
     }
 };
 
+// Gộp URL ảnh và ảnh upload vào mảng images; ảnh đầu tiên được dùng làm ảnh bìa.
 const addImages = (product, data) => {
     const urls = data.image_urls || [];
     if (!Array.isArray(urls) || urls.some((url) => typeof url !== 'string' || !/^https?:\/\//.test(url))) {
@@ -242,6 +259,7 @@ const addImages = (product, data) => {
     product.images = [...new Set([...product.images, ...uploads, ...urls])];
 };
 
+// Tạo sản phẩm và phiếu tồn ban đầu trong cùng transaction; validateOnly dùng để xem trước yêu cầu chờ duyệt.
 const createProduct = async (data, session = null, validateOnly = false) => {
     if (!mongoose.isObjectIdOrHexString(data.category_id) || !(await Category.exists({ _id: data.category_id }))) {
         throw new Error('CATEGORY_NOT_FOUND');
@@ -262,6 +280,7 @@ const createProduct = async (data, session = null, validateOnly = false) => {
 
         addImages(product, data);
         checkVariants(product);
+        // Tồn ban đầu cũng cần phiếu nhập để có chứng từ và giá nhập khi tính lãi.
         const receipt = new GoodsReceipt({
             created_by: data.user_id,
             note: 'Nhập tồn ban đầu khi tạo sản phẩm',
@@ -295,6 +314,7 @@ const createProduct = async (data, session = null, validateOnly = false) => {
             variant.stocks.push({
                 batch_code: batchCode,
                 quantity: stock.quantity,
+                list_price: stock.list_price ?? variant.list_price,
                 manufactured_date: parseDate(stock.manufactured_date),
                 expiry_date: parseDate(stock.expiry_date)
             });
@@ -323,6 +343,7 @@ const createProduct = async (data, session = null, validateOnly = false) => {
     });
 };
 
+// Kiểm tra từng quy cách và ảnh cần giữ/xóa trước khi lưu thay đổi đã được phép áp dụng.
 const updateProduct = async (data, session = null, validateOnly = false) => {
     if (!mongoose.isObjectIdOrHexString(data.id)) throw new Error('PRODUCT_NOT_FOUND');
     const product = await Product.findById(data.id).session(session);
@@ -346,6 +367,16 @@ const updateProduct = async (data, session = null, validateOnly = false) => {
             const current = product.variants.id(variant.id);
             if (!current) throw new Error('VARIANT_NOT_FOUND');
             Object.assign(current, getVariantData(variant));
+            // Chỉ sửa giá bán; lượng tồn và giá vốn vẫn giữ theo chứng từ.
+            if (variant.lot_prices !== undefined) {
+                if (!Array.isArray(variant.lot_prices)) throw new Error('INVALID_PRODUCT_DATA');
+                for (const value of variant.lot_prices) {
+                    const lot = current.stocks.find((stock) => stock.batch_code === value.batch_code);
+                    if (!lot || !Number.isSafeInteger(value.list_price) || value.list_price < 0)
+                        throw new Error('INVALID_PRODUCT_DATA');
+                    lot.list_price = value.list_price;
+                }
+            }
         } else {
             product.variants.push(getVariantData(variant));
         }
@@ -376,6 +407,7 @@ const updateProduct = async (data, session = null, validateOnly = false) => {
     return session ? { productId: product.id, slug: product.slug } : getProductDetail({ id: data.id });
 };
 
+// Kiểm tra SKU, giá nhập, lượng và ngày của từng dòng; lô cũ phải khớp ngày sản xuất/hạn dùng.
 const validateImportRows = async (items, session) => {
     const errors = [];
     const newSkus = new Set();
@@ -383,6 +415,14 @@ const validateImportRows = async (items, session) => {
     for (let index = 0; index < items.length; index++) {
         const item = items[index];
         const row = index + 1;
+        const imageUrl = typeof item?.image_url === 'string' ? item.image_url.trim() : item?.image_url;
+        if (item?.list_price != null && (!Number.isSafeInteger(item.list_price) || item.list_price < 0)) {
+            errors.push({ row, message: 'Giá bán của lô phải là số nguyên không âm' });
+        }
+        // Kiểm tra cả SKU đã có, vì API nhập cũ cũng phải tuân theo quy tắc ảnh của file.
+        if (imageUrl != null && imageUrl !== '' && !isImageUrl(imageUrl)) {
+            errors.push({ row, message: 'Link ảnh không hợp lệ; chỉ nhận URL http:// hoặc https:// tối đa 2.000 ký tự' });
+        }
         if (
             !item ||
             typeof item.sku !== 'string' ||
@@ -429,6 +469,7 @@ const validateImportRows = async (items, session) => {
     }
 };
 
+// Ghi phiếu nhập và cập nhật đúng SKU/lô; cùng SKU khác lô được lưu tồn riêng để xuất theo hạn.
 const importGoods = async (data, session = null) => {
     const { items, supplier_id, note, user_id } = data;
     if (supplier_id && (!mongoose.isObjectIdOrHexString(supplier_id) || !(await Supplier.exists({ _id: supplier_id }))))
@@ -495,16 +536,25 @@ const importGoods = async (data, session = null) => {
                     error.rows = [{ row: items.indexOf(item) + 1, message: 'Mã lô đã tồn tại với ngày sản xuất hoặc hạn sử dụng khác' }];
                     throw error;
                 }
+                if (item.list_price != null && item.list_price !== getLotPrice(variant, stock)) {
+                    const error = new Error('INVALID_ROWS');
+                    error.rows = [{ row: items.indexOf(item) + 1, message: 'Cùng mã lô phải cùng giá bán; hãy dùng mã lô mới cho đợt giá khác' }];
+                    throw error;
+                }
                 stock.quantity = Math.round((stock.quantity + item.quantity) * 1000) / 1000;
             } else {
                 variant.stocks.push({
                     batch_code: batchCode,
                     quantity: item.quantity,
+                    list_price: item.list_price ?? variant.list_price,
                     manufactured_date: parseDate(item.manufactured_date),
                     expiry_date: parseDate(item.expiry_date)
                 });
             }
 
+            // Link trống giữ nguyên ảnh. Link mới được bổ sung một lần, không thay ảnh bìa đang có.
+            const imageUrl = typeof item.image_url === 'string' ? item.image_url.trim() : '';
+            if (imageUrl && !product.images.includes(imageUrl)) product.images.push(imageUrl);
             checkVariants(product);
             await product.save({ session });
             receipt.items.push({

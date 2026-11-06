@@ -1,3 +1,4 @@
+// Thông báo các dòng thiếu giá vốn/mốc lịch sử để người xem không hiểu nhầm số liệu chưa đầy đủ.
 import { Alert } from 'antd';
 import type { RevenueReport } from '../types/admin';
 const ReportQuality = ({ quality }: { quality: RevenueReport['quality'] }) => (

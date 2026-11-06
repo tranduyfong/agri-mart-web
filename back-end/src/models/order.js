@@ -1,3 +1,4 @@
+// Order giữ thông tin tại thời điểm đặt: sản phẩm, giá, địa chỉ, trạng thái xử lý/thanh toán và các lô đã trừ kho.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
@@ -43,6 +44,7 @@ const orderSchema = new Schema({
         index: true
     },
 
+    // Khóa do frontend giữ cho một lựa chọn mua; kết hợp user_id để gửi lại chỉ nhận đơn cũ, không trừ kho lần nữa.
     checkout_key: {
         type: String,
         default: null
@@ -85,6 +87,7 @@ const orderSchema = new Schema({
     },
 
 
+    // Các số tiền được lưu lúc đặt để lịch sử đơn không đổi khi giá sản phẩm/khuyến mãi thay đổi sau này.
     total_amount: Number,
 
     shipping_fee: {
@@ -136,6 +139,7 @@ const orderSchema = new Schema({
         default: null
     },
 
+    // Lưu bản chụp địa chỉ của đơn; sửa sổ địa chỉ trong User không làm đổi thông tin giao của đơn cũ.
     shipping_address: {
         type: Schema.Types.Mixed,
         required: true
@@ -163,10 +167,16 @@ const orderSchema = new Schema({
             list_price: Number,
             quantity: Number,
             price: Number,
+            // Tổng thực trả có thể gồm nhiều lô khác giá, không lấy giá lô đầu nhân toàn bộ lượng.
+            line_total: Number,
+            line_subtotal: Number,
+            // Ghi lượng lấy từ từng lô và giá vốn khi xuất, phục vụ hoàn kho chính xác và báo cáo lợi nhuận.
             stock_allocations: [{
                 _id: false,
                 batch_code: String,
                 quantity: Number,
+                list_price: Number,
+                price: Number,
                 unit_cost: {
                     type: Number,
                     default: null,

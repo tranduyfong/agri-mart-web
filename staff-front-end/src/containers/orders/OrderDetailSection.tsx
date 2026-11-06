@@ -1,3 +1,4 @@
+// Chi tiết đơn để gọi khách xác nhận, chuẩn bị, giao, hoàn tất hoặc hủy theo bước hợp lệ.
 import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Alert, App, Button, Input, Steps, Table, Timeline } from 'antd';
@@ -9,7 +10,7 @@ import OrderApprovalButton from '../../components/OrderApprovalButton';
 import useAuth from '../../hooks/useAuth';
 import useData from '../../hooks/useData';
 import orderService from '../../services/orderService';
-import { formatPrice } from '../../utils/format';
+import { formatPrice, formatDate } from '../../utils/format';
 import { getErrorMessage } from '../../utils/errorMessage';
 const STAGES = ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED'];
 const OrderDetailSection = () => {
@@ -19,6 +20,7 @@ const OrderDetailSection = () => {
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => orderService.getOrder(id), [id]);
   const { data: order, loading, error, reload } = useData(load, 30000, ordersRevision);
+  // Gửi bước xử lý mong muốn cùng trạng thái đang xem để backend kiểm tra xung đột.
   const changeStatus = (status: string, title: string) => {
     if (!order) return;
     let note = '';
@@ -132,10 +134,16 @@ const OrderDetailSection = () => {
                     <div className="font-medium">
                       {item.name}
                       <p className="mt-1 text-xs font-normal text-muted">{item.variant_name}</p>
+                      {(item.stock_allocations || []).map((lot) => (
+                        <p key={lot.batch_code} className="mt-1 text-xs font-normal text-muted">
+                          {lot.quantity} {item.unit} · HSD {formatDate(lot.expiry_date)}
+                          {lot.price != null ? ` · ${formatPrice(lot.price)}/${item.unit}` : ''}
+                        </p>
+                      ))}
                     </div>
                   ),
                 },
-                { title: 'Đơn giá', render: (_, item) => `${formatPrice(item.price)} / ${item.unit}` },
+                { title: 'Đơn giá', render: (_, item) => `${(item.stock_allocations?.length || 0) > 1 ? 'Từ ' : ''}${formatPrice(item.price)} / ${item.unit}` },
                 { title: 'Số lượng', render: (_, item) => `${item.quantity.toLocaleString('vi-VN')} ${item.unit}` },
                 {
                   title: 'Thành tiền',

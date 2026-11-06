@@ -1,3 +1,4 @@
+// Tạo đối tượng VNPay dùng chung từ thông tin merchant trong .env; thiếu cấu hình thì chưa bật thanh toán VNPay.
 const { VNPay, ignoreLogger } = require('vnpay');
 require('dotenv').config();
 

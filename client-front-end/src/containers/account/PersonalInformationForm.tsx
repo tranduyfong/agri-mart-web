@@ -1,3 +1,4 @@
+// Cho phép bật chế độ sửa hồ sơ, lưu dữ liệu hợp lệ hoặc hủy để về thông tin đã lưu.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { App, Button, Form, Input } from 'antd';
@@ -19,12 +20,14 @@ const PersonalInformationForm = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const defaultAddress = addresses.find((address) => address.is_default);
 
+  // Khôi phục form về hồ sơ đã lưu, bỏ các nội dung vừa nhập nhưng chưa gửi.
   const cancelEditing = () => {
     form.setFieldsValue({ full_name: user.full_name, phone: user.phone });
     setHasChanges(false);
     setIsEditing(false);
   };
 
+  // Lưu hồ sơ và cập nhật thông tin tài khoản dùng ở menu/header.
   const handleSubmit = async (values: ProfileFormValues) => {
     setIsSubmitting(true);
     try {

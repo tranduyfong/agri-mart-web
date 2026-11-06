@@ -1,3 +1,4 @@
+// Tiêu đề trang quản lý, mô tả và vùng nút hành động được truyền từ từng màn hình.
 import type { ReactNode } from 'react';
 const PageHeader = ({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) => (
   <div data-aos="fade-up" className="mb-7 flex flex-wrap items-start justify-between gap-4">

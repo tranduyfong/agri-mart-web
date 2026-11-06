@@ -1,3 +1,5 @@
+// Nhận request của nhóm danh mục, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống nhất dữ liệu
+// trả cho frontend.
 const categoryService = require('../services/category.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { getPagination, buildPagination } = require('../utils/pagination.util');

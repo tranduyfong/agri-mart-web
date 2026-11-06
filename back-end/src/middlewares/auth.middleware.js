@@ -1,8 +1,10 @@
+// Xác thực Bearer token, đối chiếu phiên với User và gắn thông tin người đăng nhập vào req.user.
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/user');
 const { errorResponse } = require('../utils/response.util');
 
+// Lấy token từ Authorization, xác minh chữ ký và token_version rồi mới cho request đi tiếp.
 const verifyToken = async (req, res, next) => {
     const header = req.headers.authorization;
 
@@ -54,11 +56,13 @@ const verifyToken = async (req, res, next) => {
     }
 };
 
+// Dùng sau verifyToken để giới hạn API chỉ dành cho ADMIN.
 const verifyAdmin = (req, res, next) => {
     if (req.user?.role === 'ADMIN') return next();
     return errorResponse(res, 'FORBIDDEN', 'Chỉ dành cho Admin', 403);
 };
 
+// Cho phép vai trò quản lý; nhóm quyền chi tiết được kiểm tra ở middleware tiếp theo.
 const verifyAdminOrStaff = (req, res, next) => {
     if (['ADMIN', 'STAFF'].includes(req.user?.role)) return next();
     return errorResponse(res, 'FORBIDDEN', 'Yêu cầu quyền Admin hoặc Nhân viên', 403);

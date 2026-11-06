@@ -1,3 +1,4 @@
+// Thẻ ảnh/tên danh mục; chọn thẻ sẽ mở cửa hàng với bộ lọc danh mục tương ứng.
 import { Link } from 'react-router-dom';
 import { AppstoreOutlined } from '@ant-design/icons';
 import type { Category } from '../types/category';

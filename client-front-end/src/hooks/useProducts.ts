@@ -1,3 +1,4 @@
+// Tải danh sách theo bộ lọc và khóa truy vấn; quản lý trạng thái đang tải/lỗi cho các vùng sản phẩm.
 import { useEffect, useState } from 'react';
 import productService from '../services/productService';
 import type { ProductListItem, ProductQuery } from '../types/product';
@@ -14,6 +15,7 @@ const useProducts = (query: ProductQuery) => {
   // Lưu query của lần tải gần nhất, khác queryKey hiện tại nghĩa là đang tải
   const [loadedQueryKey, setLoadedQueryKey] = useState('');
 
+  // Khóa query thay đổi thì gọi API lại; chỉ kết quả ứng với bộ lọc hiện tại được hiển thị.
   useEffect(() => {
     let isOutdated = false; // Query đã đổi trước khi API trả về -> bỏ qua kết quả cũ
 

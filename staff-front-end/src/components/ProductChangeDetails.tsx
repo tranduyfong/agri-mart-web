@@ -1,3 +1,4 @@
+// Hiển thị bản trước/sau của yêu cầu sản phẩm hoặc các dòng nhập hàng để người xem đối chiếu.
 import { Alert, Image, Table, Tag } from 'antd';
 import Panel from './Panel';
 import { formatDate, formatPrice } from '../utils/format';
@@ -5,6 +6,7 @@ import { getFileUrl } from '../utils/fileUrl';
 import { CHANGE_COLORS, CHANGE_STATUSES, type ProductChangeDetail, type ProductSnapshot } from '../types/productChange';
 
 const productStatuses: Record<string, string> = { DRAFT: 'Bản nháp', PUBLISHED: 'Đang bán', ARCHIVED: 'Ngừng bán' };
+// Trình bày dữ liệu của một bản chụp để đối chiếu trước và sau thay đổi.
 const Snapshot = ({ title, data }: { title: string; data: ProductSnapshot }) => (
   <Panel title={title}>
     <dl className="space-y-3 text-sm">
@@ -47,6 +49,14 @@ const Snapshot = ({ title, data }: { title: string; data: ProductSnapshot }) => 
         { title: 'Đơn vị', dataIndex: 'unit' },
         { title: 'Bước bán', dataIndex: 'step_quantity' },
         { title: 'Giá niêm yết', dataIndex: 'list_price', render: formatPrice },
+        {
+          title: 'Giá bán theo lô',
+          render: (_, row) => (row.lot_prices || []).map((lot) => (
+            <p key={lot.batch_code} className="text-xs">
+              {lot.batch_code} · HSD {formatDate(lot.expiry_date)} · {formatPrice(lot.list_price)}
+            </p>
+          )),
+        },
       ]}
     />
     {!!data.initial_stock?.some((stock) => stock && stock.quantity > 0) && (
@@ -100,6 +110,14 @@ const ProductChangeDetails = ({ change }: { change: ProductChangeDetail }) => (
           pagination={{ pageSize: 10, showSizeChanger: false }}
           columns={[
             {
+              title: 'Ảnh bổ sung',
+              dataIndex: 'image_url',
+              width: 110,
+              render: (url?: string) => url ? (
+                <Image src={url} alt="Ảnh đề nghị nhập" width={52} height={52} style={{ objectFit: 'contain' }} />
+              ) : 'Không bổ sung',
+            },
+            {
               title: 'SKU / Sản phẩm',
               render: (_, row) => (
                 <>
@@ -113,7 +131,7 @@ const ProductChangeDetails = ({ change }: { change: ProductChangeDetail }) => (
             { title: 'Số lượng', render: (_, row) => `${row.quantity} ${row.unit}` },
             { title: 'Giá nhập', dataIndex: 'unit_cost', render: (value?: number) => formatPrice(value || 0) },
             {
-              title: 'Giá niêm yết (SKU mới)',
+              title: 'Giá bán lô',
               dataIndex: 'list_price',
               render: (value: number | null) => (value == null ? 'Giữ giá hiện tại' : formatPrice(value)),
             },

@@ -1,3 +1,4 @@
+// Lưu nội dung bản tin, tiến độ gửi và kết quả từng email để xem lại lịch sử.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

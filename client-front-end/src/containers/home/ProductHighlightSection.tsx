@@ -1,3 +1,4 @@
+// Ghép các cột sản phẩm nổi bật theo bố cục của trang chủ.
 import ProductHighlightColumn from './ProductHighlightColumn';
 
 // Khối 4 cột sản phẩm: Xu hướng / Mới về / Bán chạy nhất / Đang giảm giá

@@ -1,3 +1,4 @@
+// Các hook Redux đã gắn kiểu RootState/AppDispatch để component khách hàng đọc state và gọi action đúng kiểu.
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 

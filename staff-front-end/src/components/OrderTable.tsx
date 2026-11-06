@@ -1,3 +1,4 @@
+// Bảng đơn hàng dùng lại ở dashboard và danh sách, gồm người nhận, thanh toán và thao tác chi tiết.
 import { Table } from 'antd';
 import type { TableProps } from 'antd';
 import { Link } from 'react-router-dom';

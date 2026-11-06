@@ -1,3 +1,4 @@
+// Hiển thị kết quả đặt hàng, chờ nhân viên xác nhận và cho phép tiếp tục/đối soát thanh toán VNPay.
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -13,6 +14,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import orderService from '../../services/orderService';
+import LotPriceDetails from '../../components/LotPriceDetails';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { logout } from '../../store/slices/authSlice';
 import { clearAuth, getSavedAccessToken } from '../../utils/authStorage';
@@ -43,6 +45,7 @@ const OrderResultSection = () => {
   const order = result?.key === requestKey ? result.order : null;
   const errorMessage = error?.key === requestKey ? error.message : '';
 
+  // Tải dữ liệu lần đặt theo mã URL; phiên hết hạn thì chuyển đăng nhập cùng đường quay lại.
   useEffect(() => {
     if (!sessionToken) return;
     let outdated = false;
@@ -69,6 +72,7 @@ const OrderResultSection = () => {
     order?.payment_method === 'VNPAY' && order.payment_status === 'UNPAID' && order.status === 'CONFIRMED';
   const awaitingConfirmation = order?.status === 'PENDING';
   const isInProgress = !!order && !['COMPLETED', 'CANCELLED'].includes(order.status);
+  // Khi đơn còn xử lý/chờ xác nhận, kiểm tra lại theo chu kỳ để cập nhật trạng thái và quyền tiếp tục trả tiền.
   useEffect(() => {
     if (!isInProgress) return;
     let outdated = false;
@@ -90,6 +94,7 @@ const OrderResultSection = () => {
     };
   }, [code, isPending, awaitingConfirmation, isInProgress, requestKey, sessionToken]);
 
+  // Yêu cầu backend đối soát với VNPay rồi cập nhật dữ liệu đơn thay vì tự tin tham số URL.
   const checkPayment = async () => {
     setIsBusy(true);
     try {
@@ -105,6 +110,7 @@ const OrderResultSection = () => {
     }
   };
 
+  // Xin URL thanh toán khi backend xác nhận đơn đã đủ điều kiện và còn thời hạn.
   const resumePayment = async () => {
     setIsBusy(true);
     try {
@@ -205,7 +211,7 @@ const OrderResultSection = () => {
                     : isPending
                       ? 'Nhân viên đã xác nhận đơn. Bạn có 15 phút từ lúc duyệt để thanh toán qua VNPay.'
                       : order.status === 'COMPLETED'
-                        ? 'Cảm ơn bạn đã mua sắm tại AgriFood Smart. Chúc bạn có những bữa ăn ngon!'
+                        ? 'Cảm ơn bạn đã mua sắm tại Agri-Mart. Chúc bạn có những bữa ăn ngon!'
                         : order.status === 'SHIPPING'
                           ? 'Đơn hàng đang trên đường đến bạn. Vui lòng giữ liên lạc để nhận hàng.'
                           : isCod
@@ -290,7 +296,7 @@ const OrderResultSection = () => {
                     {item.variant_name} · {item.quantity.toLocaleString('vi-VN')} {item.unit}
                   </p>
                 </div>
-                <span className="shrink-0 font-medium text-gray-700">{formatPrice(item.line_total)}</span>
+                <div><LotPriceDetails parts={item.price_breakdown} unit={item.unit} /><span className="shrink-0 font-medium text-gray-700">{formatPrice(item.line_total)}</span></div>
               </li>
             ))}
           </ul>

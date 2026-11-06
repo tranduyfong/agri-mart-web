@@ -1,3 +1,4 @@
+// Quản lý danh mục: xem danh sách, chọn sửa hoặc tạo mới cùng ảnh đại diện.
 import { useCallback, useState } from 'react';
 import { Alert, App, Button, Form, Input, Table } from 'antd';
 import PageHeader from '../../components/PageHeader';
@@ -19,11 +20,13 @@ const CategorySection = () => {
   const { message } = App.useApp();
   const load = useCallback(() => categoryService.getCategories(query), [query]);
   const { data, loading, error: loadError, reload } = useData(load);
+  // Đưa danh mục được chọn và ảnh hiện tại vào form sửa.
   const edit = (item: Category) => {
     setEditing(item);
     form.setFieldsValue({ ...item, image: { url: item.image_url || '' } });
     document.getElementById('category-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+  // Gửi tên/slug và ảnh của danh mục qua FormData, sau đó tải lại danh sách.
   const submit = async (values: { name: string; slug: string; image?: ImageValue }) => {
     setBusy(true);
     setError('');

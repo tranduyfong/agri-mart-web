@@ -1,3 +1,4 @@
+// Hợp đồng thông tin sản phẩm, quy cách, ảnh và các bộ lọc phục vụ màn hình sản phẩm.
 import type { PaginatedResponse } from './api';
 
 // Kiểu sắp xếp danh sách sản phẩm mà back-end hỗ trợ
@@ -54,7 +55,7 @@ export interface ProductVariant {
   step_quantity: number;
   list_price: number;
   stock_quantity: number;
-  stock_lots?: { batch_code: string; quantity: number; expiry_date: string; unit_cost: number | null }[];
+  stock_lots?: { batch_code: string; quantity: number; expiry_date: string; list_price: number; unit_cost: number | null }[];
 }
 
 export interface ProductImage {

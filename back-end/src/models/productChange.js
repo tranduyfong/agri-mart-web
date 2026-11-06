@@ -1,3 +1,4 @@
+// Lưu yêu cầu thêm/sửa/nhập hàng của nhân viên để quản trị viên duyệt trước khi áp dụng vào dữ liệu thật.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
@@ -32,6 +33,7 @@ const productChangeSchema = new Schema({
         type: Schema.Types.Mixed,
         required: true
     },
+    // Bản trước/sau phục vụ đối chiếu khi duyệt; data là payload sẽ áp dụng, không phải Product đã được ghi thật.
     before: {
         type: Schema.Types.Mixed,
         default: null
@@ -68,6 +70,7 @@ const productChangeSchema = new Schema({
 
 productChangeSchema.index({ status: 1, created_at: -1 });
 productChangeSchema.index({ requested_by: 1, created_at: -1 });
+// Một sản phẩm chỉ có một yêu cầu UPDATE đang chờ để tránh hai bản sửa cạnh tranh nhau.
 productChangeSchema.index({ product_id: 1 }, {
     unique: true,
     partialFilterExpression: { type: 'UPDATE', status: 'PENDING' }

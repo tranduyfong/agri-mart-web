@@ -1,3 +1,4 @@
+// Form đăng nhập ứng dụng quản lý; AuthProvider xác minh phiên/vai trò trước khi điều hướng vào trang làm việc.
 import { useState } from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Alert, Button, Form, Input } from 'antd';
@@ -11,6 +12,7 @@ const LoginForm = () => {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   if (user) return <Navigate to="/" replace />;
+  // Gọi login từ AuthContext và điều hướng khi phiên quản lý đã được backend chấp nhận.
   const submit = async (values: { email: string; password: string }) => {
     setBusy(true);
     setError('');

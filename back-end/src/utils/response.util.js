@@ -1,3 +1,4 @@
+// Đóng gói response thành định dạng chung, kèm requestId và thời gian để frontend xử lý thống nhất.
 const { v4: uuidv4 } = require('uuid');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');

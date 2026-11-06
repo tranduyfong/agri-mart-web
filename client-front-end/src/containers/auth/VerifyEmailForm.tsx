@@ -1,3 +1,4 @@
+// Kết nối form OTP với API xác minh tài khoản và gửi lại mã qua email.
 import { App } from 'antd';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import OtpVerifyForm from '../../components/OtpVerifyForm';
@@ -25,6 +26,7 @@ const VerifyEmailForm = () => {
     navigate(ROUTES.LOGIN, { state: { email } });
   };
 
+  // Yêu cầu backend gửi lại OTP cho đúng email đang xác minh.
   const handleResend = () => authService.resendVerifyEmail(email);
 
   return (

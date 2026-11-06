@@ -1,3 +1,4 @@
+// Lớp ảnh nền dùng chung cho khuyến mãi; phần chữ/đếm ngược được đặt ở lớp phía trên.
 import { getFileUrl } from '../utils/fileUrl';
 
 const PromotionBackground = ({ imageUrl }: { imageUrl?: string | null }) => (

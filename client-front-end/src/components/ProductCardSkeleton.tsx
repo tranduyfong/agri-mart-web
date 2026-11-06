@@ -1,3 +1,4 @@
+// Khung tải tạm có hình dạng giống thẻ sản phẩm để bố cục không nhảy khi chờ API.
 import { Skeleton } from 'antd';
 
 // Khung xám nhấp nháy thay cho thẻ sản phẩm trong lúc đang tải dữ liệu

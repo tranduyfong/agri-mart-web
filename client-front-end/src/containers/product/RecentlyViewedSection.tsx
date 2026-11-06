@@ -1,3 +1,4 @@
+// Hiển thị lại các sản phẩm người dùng đã xem, bỏ sản phẩm đang mở.
 import ProductRow from '../../components/ProductRow';
 import useRecentlyViewedProducts from '../../hooks/useRecentlyViewedProducts';
 import { getProductCardItem } from '../../utils/productCard';

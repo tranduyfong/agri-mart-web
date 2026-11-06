@@ -1,3 +1,4 @@
+// Đổi mã trạng thái backend thành nhãn tiếng Việt và màu để hiển thị nhất quán.
 import { Tag } from 'antd';
 const STATUSES: Record<string, [string, string]> = {
   PENDING: ['Chờ xác nhận', 'gold'],

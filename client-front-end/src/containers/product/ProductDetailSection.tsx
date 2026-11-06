@@ -1,3 +1,4 @@
+// Ghép thư viện ảnh, thông tin mua hàng, sản phẩm liên quan và ghi nhận sản phẩm vừa xem.
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Breadcrumb, Button, Result } from 'antd';
@@ -19,6 +20,7 @@ interface ProductDetailSectionProps {
 const ProductDetailSection = ({ slug }: ProductDetailSectionProps) => {
   const { product, errorMessage, isNotFound, isLoading, reload } = useProductDetail(slug);
 
+  // Khi đổi slug, cuộn lên đầu để bắt đầu xem chi tiết sản phẩm mới.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [slug]);

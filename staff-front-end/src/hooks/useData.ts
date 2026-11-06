@@ -1,3 +1,4 @@
+// Hook tải dữ liệu dùng chung: bỏ kết quả cũ khi đổi truy vấn và hỗ trợ tải lại/tự cập nhật định kỳ.
 import { useEffect, useState } from 'react';
 import { getErrorMessage } from '../utils/errorMessage';
 
@@ -5,6 +6,7 @@ import { getErrorMessage } from '../utils/errorMessage';
 const useData = <T>(load: () => Promise<T>, interval = 0, refreshKey = 0) => {
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ load: typeof load; revision: number; data?: T; error?: string } | null>(null);
+  // Gọi hàm load theo bộ lọc hiện tại, bỏ kết quả cũ và dọn interval khi component rời màn hình.
   useEffect(() => {
     let outdated = false;
     let pending = false;

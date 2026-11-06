@@ -1,3 +1,4 @@
+// Tải hồ sơ/sổ địa chỉ theo phiên đăng nhập; đồng bộ thông tin người dùng sau khi chỉnh sửa và xử lý phiên hết hạn.
 import { useEffect, useState } from 'react';
 import { App } from 'antd';
 import axios from 'axios';
@@ -28,12 +29,14 @@ const useAccount = () => {
   const [result, setResult] = useState<AccountResult | null>(null);
   const requestKey = JSON.stringify([sessionToken, retryCount]);
 
+  // Đồng bộ hồ sơ mới vào nơi lưu phiên và state dùng chung của khách hàng.
   const syncUser = (user: AuthUser) => {
     if (!sessionToken || getSavedAccessToken() !== sessionToken) return;
     saveAuth(user, sessionToken);
     dispatch(updateUser(user));
   };
 
+  // Tải tài khoản theo token/khóa hiện tại; chỉ nhận kết quả nếu request vẫn thuộc phiên đang dùng.
   useEffect(() => {
     if (!sessionToken) return;
     let isOutdated = false;
@@ -53,12 +56,14 @@ const useAccount = () => {
     return () => { isOutdated = true; };
   }, [sessionToken, requestKey, dispatch]);
 
+  // Nhận hồ sơ sau khi lưu để các vùng giao diện thấy cùng một thông tin mới.
   const onUserUpdated = (user: AuthUser) => {
     if (getSavedAccessToken() !== sessionToken) return;
     syncUser(user);
     setResult((current) => current?.data ? { ...current, data: { ...current.data, user } } : current);
   };
 
+  // Cập nhật sổ địa chỉ trong dữ liệu tài khoản đang dùng cho các tab con.
   const onAddressesUpdated = (addresses: UserAddress[]) => {
     if (getSavedAccessToken() !== sessionToken) return;
     setResult((current) => current?.data ? { ...current, data: { ...current.data, addresses } } : current);

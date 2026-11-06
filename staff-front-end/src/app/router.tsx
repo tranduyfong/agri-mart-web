@@ -1,3 +1,5 @@
+// Ánh xạ URL tới page và layout; các route con dùng lại bố cục, còn ứng dụng quản lý kiểm tra phiên/quyền trước khi
+// mở trang.
 import { createBrowserRouter, Link } from 'react-router-dom';
 import { Button, Result } from 'antd';
 import ProtectedRoute from '../components/ProtectedRoute';

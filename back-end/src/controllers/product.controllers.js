@@ -1,3 +1,5 @@
+// Nhận request của nhóm sản phẩm, chi tiết và nhập hàng, kiểm tra đầu vào và gọi service;
+// successResponse/errorResponse thống nhất dữ liệu trả cho frontend.
 const productService = require('../services/product.services');
 const productChangeService = require('../services/productChange.services');
 const { staffErrorResponse } = require('../utils/staffError.util');
@@ -61,6 +63,7 @@ const getPublicProducts = (req, res) => handleGetProducts(req, res, true);
 // [Nhân viên] Danh sách tất cả sản phẩm (bao gồm nháp, ngừng bán), lọc được theo status
 const getManageProducts = (req, res) => handleGetProducts(req, res, false);
 
+// Lấy gợi ý liên quan tới một sản phẩm qua service thuật toán.
 const getRelatedProducts = async (req, res) => {
     try {
         return successResponse(res, await productService.getRelatedProducts(req.params.id));
@@ -102,6 +105,7 @@ const getManageProductDetail = async (req, res) => {
     }
 };
 
+// Đọc multipart/quy cách/ảnh; STAFF gửi đề nghị chờ duyệt, ADMIN áp dụng theo nghiệp vụ sản phẩm.
 const addProduct = async (req, res) => {
     // Lấy danh sách file ảnh đã được middleware upload xuống ổ cứng
     const uploadedFiles = req.files || [];
@@ -255,7 +259,7 @@ const importGoods = async (req, res) => {
             `Nhập hàng thành công ${result.total_rows} dòng (tạo mới ${result.created_products} sản phẩm, ${result.created_variants} SKU)`
         );
     } catch (error) {
-        if (error.message === 'IMPORT_INVALID_ROWS') return staffErrorResponse(res, error);
+        if (['IMPORT_INVALID_ROWS', 'SUPPLIER_REQUIRED'].includes(error.message)) return staffErrorResponse(res, error);
         if (error.message === 'INVALID_ROWS') {
             return errorResponse(res, 'VALIDATION_FAILED', `Có ${error.rows.length} dòng bị lỗi, vui lòng sửa lại`, 400, error.rows);
         }

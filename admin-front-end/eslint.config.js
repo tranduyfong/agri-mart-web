@@ -1,3 +1,4 @@
+// Quy tắc lint cho source TypeScript/React; kiểm tra cả cách dùng Hooks, không quét bản build dist.
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

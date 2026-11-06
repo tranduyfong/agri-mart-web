@@ -1,3 +1,5 @@
+// Nhận request của nhóm khuyến mãi đang chạy, kiểm tra đầu vào và gọi service; successResponse/errorResponse thống
+// nhất dữ liệu trả cho frontend.
 const promotionService = require('../services/promotion.services');
 const { successResponse, errorResponse } = require('../utils/response.util');
 const { getPagination, buildPagination } = require('../utils/pagination.util');

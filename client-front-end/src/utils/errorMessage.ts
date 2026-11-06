@@ -1,3 +1,4 @@
+// Lấy mã/thông báo từ response lỗi của backend, có nội dung dự phòng khi lỗi mạng hoặc dữ liệu khác dạng.
 import axios from 'axios';
 
 // Lấy câu thông báo lỗi để hiển thị cho người dùng

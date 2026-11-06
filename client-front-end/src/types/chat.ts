@@ -1,3 +1,4 @@
+// Hợp đồng dữ liệu phòng chat, tin nhắn và thẻ gợi ý AI; trạng thái kho của thẻ được tính ở backend.
 export interface ChatRecommendation {
   product_id: string;
   variant_id: string;
@@ -7,6 +8,7 @@ export interface ChatRecommendation {
   thumbnail_url: string | null;
   quantity: number;
   price: number | null;
+  line_total?: number | null;
   list_price: number | null;
   stock_quantity: number;
   available: boolean;

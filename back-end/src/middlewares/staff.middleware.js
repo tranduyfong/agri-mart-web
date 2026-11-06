@@ -1,3 +1,4 @@
+// Nạp thông tin nhân viên và các quyền dùng cho những API quản lý cửa hàng.
 const User = require('../models/user');
 const { errorResponse } = require('../utils/response.util');
 

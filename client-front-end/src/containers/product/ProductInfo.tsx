@@ -1,3 +1,4 @@
+// Thông tin giá/tồn/quy cách, yêu thích, thêm giỏ và nút mua ngay chuyển trực tiếp tới checkout.
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { App, Button, Input } from 'antd';
@@ -15,6 +16,8 @@ import { getFileUrl } from '../../utils/fileUrl';
 import IconButton from '../../components/IconButton';
 import PrimaryButton from '../../components/PrimaryButton';
 import QuantitySelector from '../../components/QuantitySelector';
+import LotPriceDetails from '../../components/LotPriceDetails';
+import { quoteSaleLots } from '../../utils/lotPricing';
 import type { ProductDetail, ProductVariant } from '../../types/product';
 import { ROUTES } from '../../utils/constants';
 import { formatPrice } from '../../utils/format';
@@ -40,14 +43,17 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
   const isOutOfStock = maxQuantity === 0;
   const originalPrice = selectedVariant?.list_price ?? 0;
   const salePrice = Math.round(originalPrice * (1 - (product.discount_percent || 0) / 100));
-  const totalPrice = salePrice * quantity;
+  const quote = quoteSaleLots(selectedVariant, quantity, product.discount_percent || 0);
+  const totalPrice = quote.total;
   const description = product.description?.trim();
 
+  // Đổi quy cách để cập nhật giá, tồn và lượng mua hợp lệ.
   const selectVariant = (variant: ProductVariant) => {
     setSelectedVariantId(variant.id);
     setQuantity(normalizeQuantity(1, variant));
   };
 
+  // Gửi sản phẩm theo quy cách/số lượng đang chọn vào giỏ bằng hook dùng chung.
   const addToCart = async (source: HTMLElement | null) => {
     if (!selectedVariant || quantity <= 0 || isBusy) return;
     await runMutation(
@@ -57,11 +63,13 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
     );
   };
 
+  // Đi thẳng đến checkout với ID quy cách và số lượng, không thêm dòng vào giỏ.
   const buyNow = () => {
     if (!selectedVariant || quantity <= 0 || isBusy) return;
     navigate(`${ROUTES.CHECKOUT}?variant=${encodeURIComponent(selectedVariant.id)}&quantity=${quantity}`);
   };
 
+  // Chia sẻ hoặc sao chép liên kết sản phẩm bằng khả năng của trình duyệt.
   const shareProduct = async () => {
     const url = window.location.href;
     try {
@@ -130,6 +138,8 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
         )}
       </div>
 
+      <LotPriceDetails parts={quote.parts} unit={selectedVariant?.unit || ''} />
+      <p className="mt-2 text-xs text-gray-500">Ưu tiên lô gần hết hạn. Tổng tiền tính theo từng lô được lấy.</p>
       <div className="mt-5 text-sm leading-6 text-gray-500">
         <p className={`whitespace-pre-line ${isDescriptionExpanded ? '' : 'line-clamp-5'}`}>
           {description || 'Thông tin mô tả sản phẩm đang được cập nhật.'}

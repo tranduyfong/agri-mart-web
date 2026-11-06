@@ -1,3 +1,4 @@
+// Axios dùng chung cho ứng dụng: lấy địa chỉ backend từ cấu hình, gắn token và thống nhất xử lý phiên ở các request.
 import axios from 'axios';
 import { getSavedAccessToken } from '../utils/authStorage';
 

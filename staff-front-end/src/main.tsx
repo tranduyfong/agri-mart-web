@@ -1,3 +1,5 @@
+// Điểm khởi động React: nạp font/CSS, theme/locale, hiệu ứng AOS và Context phiên đăng nhập cho toàn ứng dụng quản
+// lý.
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App as AntdApp, ConfigProvider } from 'antd';
@@ -20,6 +22,7 @@ AOS.init({
   offset: 20,
   disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 });
+// Context giữ phiên nhân viên; ConfigProvider/App cung cấp giao diện và thông báo Ant Design cho mọi trang.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StyleProvider layer>

@@ -1,3 +1,4 @@
+// Nghiệp vụ chat dùng chung: kiểm tra quyền sở hữu, lưu tin, phân trang lịch sử, tiếp nhận và đánh dấu đã đọc.
 const fs = require('node:fs');
 const mongoose = require('mongoose');
 const ChatRoom = require('../models/chatRoom');
@@ -7,12 +8,17 @@ const { notifyChatChanged } = require('../utils/chatEvents.util');
 const { deleteUploadedFiles } = require('../utils/file.util');
 const chatAi = require('./chatAi.services');
 const gemini = require('../configs/gemini.config');
+const { isShoppingQuestion, wantsStaff, needsOrderSupport } = require('../utils/chatShopping.util');
 
 const PAGE_SIZE = 50;
+// Xác định loại tin được tính là tin đến đối với khách hoặc nhân viên.
 const incoming = (customer) => customer ? { $in: ['STAFF', 'AI'] } : 'CUSTOMER';
+// Đếm tin đến mà tài khoản hiện tại chưa có trong mảng read_by.
 const unreadQuery = (userId, customer) => ({ sender_type: incoming(customer), read_by: { $ne: new mongoose.Types.ObjectId(userId) } });
+// Ưu tiên hội thoại chính của khách; vẫn đọc được các hội thoại đã có từ trước.
 const customerRoom = (userId) => ChatRoom.findOne({ customer_id: userId }).sort({ conversation_key: -1, updated_at: -1 });
 
+// Lọc thông tin hội thoại cho giao diện, kèm trạng thái AI và số chưa đọc.
 const roomSummary = (room, unreadCount = 0, last = null) => ({
     id: room._id.toString(),
     customer_id: (room.customer_id?._id || room.customer_id)?.toString() || null,
@@ -29,6 +35,7 @@ const roomSummary = (room, unreadCount = 0, last = null) => ({
     last_message: last ? { content: last.content, sender_type: last.sender_type, has_images: !!last.attachments?.length, created_at: last.created_at } : null
 });
 
+// Tìm hội thoại theo khách/trạng thái và gắn tin cuối cùng cùng số chưa đọc của người xem.
 const getRooms = async (status, userId, keyword = '') => {
     const query = {};
     if (status && ['AI_ACTIVE', 'STAFF_ACTIVE', 'CLOSED'].includes(status)) query.status = status;
@@ -50,6 +57,7 @@ const getRooms = async (status, userId, keyword = '') => {
     return rooms.map((room) => roomSummary(room, counts.get(room._id.toString()) || 0, lastByRoom.get(room._id.toString())));
 };
 
+// Kiểm tra quyền sở hữu nếu là khách, lấy một trang lịch sử và tính lại các thẻ gợi ý sản phẩm.
 const getRoom = async (id, userId, customer = false, before = '') => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     if (before && !mongoose.isObjectIdOrHexString(before)) throw new Error('INVALID_DATA');
@@ -61,6 +69,7 @@ const getRoom = async (id, userId, customer = false, before = '') => {
         ChatMessage.countDocuments({ room_id: id, ...unreadQuery(userId, customer) }),
         ChatMessage.findOne({ room_id: id }).sort({ _id: -1 }).lean()
     ]);
+    // Lấy dư một tin để biết còn trang trước; đảo lại trang hiện tại theo thứ tự cũ đến mới cho giao diện.
     const hasMore = messages.length > PAGE_SIZE;
     const page = messages.slice(0, PAGE_SIZE).reverse();
     const references = page.flatMap((message) => message.recommendations || []);
@@ -84,28 +93,32 @@ const getRoom = async (id, userId, customer = false, before = '') => {
     };
 };
 
+// Tìm hội thoại của chính khách đang đăng nhập; chưa gửi tin lần nào thì trả null.
 const getCustomerRoom = async (userId, before) => {
     const room = await customerRoom(userId).lean();
     return room ? getRoom(room._id.toString(), userId, true, before) : null;
 };
 
+// Đếm chưa đọc riêng cho tài khoản, phục vụ bong bóng chat hoặc sidebar.
 const getSummary = async (userId, customer = false) => {
     const room = customer ? await customerRoom(userId).lean() : null;
     if (customer && !room) return { unread_count: 0 };
     return { unread_count: await ChatMessage.countDocuments({ ...(room ? { room_id: room._id } : {}), ...unreadQuery(userId, customer) }) };
 };
 
+// Tiếp nhận theo điều kiện để hai nhân viên không giành cùng phòng; đồng thời dừng hàng đợi AI.
 const claimRoom = async (userId, id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const room = await ChatRoom.findOneAndUpdate(
         { _id: id, $or: [{ status: 'AI_ACTIVE' }, { status: 'STAFF_ACTIVE', assigned_staff_id: userId }] },
-        { $set: { status: 'STAFF_ACTIVE', assigned_staff_id: userId, ai_pending: false, ai_locked_until: null, waiting_for_staff: false } }, { new: true }
+        { $set: { status: 'STAFF_ACTIVE', assigned_staff_id: userId, ai_pending: false, ai_locked_until: null, waiting_for_staff: false, handoff_reason: null } }, { new: true }
     );
     if (!room) throw new Error('ROOM_TAKEN');
     notifyChatChanged(room);
     return getRoom(id, userId);
 };
 
+// Chấp nhận chữ hoặc ảnh, kiểm tra giới hạn và chữ ký file ảnh trước khi lưu tin.
 const checkMessage = (content, files, clientId) => {
     if (typeof content !== 'string' || content.length > 5000 || files.length > 3 || (!content.trim() && !files.length)) throw new Error('INVALID_DATA');
     if (clientId != null && (typeof clientId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(clientId))) throw new Error('INVALID_DATA');
@@ -121,6 +134,7 @@ const checkMessage = (content, files, clientId) => {
     }
 };
 
+// Lưu tin và cập nhật phòng trong transaction; client_id giúp gửi lại không tạo bản sao.
 const sendMessage = async (userId, id, content, files = [], clientId, customer = false) => {
     checkMessage(content, files, clientId);
     if (!customer && !mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
@@ -129,6 +143,7 @@ const sendMessage = async (userId, id, content, files = [], clientId, customer =
         try {
             await mongoose.connection.transaction(async (session) => {
                 duplicate = false;
+                // client_id được frontend giữ khi thử gửi lại; đã có tin này thì trả phòng cũ thay vì chèn thêm.
                 const existing = clientId ? await ChatMessage.findOne({ sender_id: userId, client_id: clientId }).session(session) : null;
                 if (existing) {
                     savedRoom = await ChatRoom.findOne({ _id: customer ? existing.room_id : id, ...(customer ? { customer_id: userId } : {}) }).session(session);
@@ -141,7 +156,10 @@ const sendMessage = async (userId, id, content, files = [], clientId, customer =
                     room = await customerRoom(userId).session(session);
                     if (!room) room = new ChatRoom({ customer_id: userId, conversation_key: 'customer:' + userId });
                     room.conversation_key = 'customer:' + userId;
-                    if (room.status === 'CLOSED') { room.status = 'AI_ACTIVE'; room.assigned_staff_id = null; room.waiting_for_staff = false; }
+                    if (room.status === 'CLOSED') { room.status = 'AI_ACTIVE'; room.assigned_staff_id = null; room.waiting_for_staff = false; room.handoff_reason = null; }
+                    // Khôi phục phòng cũ bị kẹt do lỗi kỹ thuật, nhưng không chen vào yêu cầu gặp người thật/đơn hàng.
+                    if (room.status === 'AI_ACTIVE' && room.waiting_for_staff && !room.handoff_reason &&
+                        !room.assigned_staff_id && isShoppingQuestion(content) && !wantsStaff(content) && !needsOrderSupport(content)) room.waiting_for_staff = false;
                     if (room.status === 'AI_ACTIVE' && !room.waiting_for_staff && gemini.isEnabled()) room.ai_pending = true;
                 } else {
                     room = await ChatRoom.findOne({ _id: id, status: 'STAFF_ACTIVE', assigned_staff_id: userId }).session(session);
@@ -170,6 +188,7 @@ const sendMessage = async (userId, id, content, files = [], clientId, customer =
     catch (error) { error.keepUploads = true; throw error; }
 };
 
+// Chỉ đánh dấu tới tin cuối người dùng đã xem; tin đến sau mốc này vẫn giữ chưa đọc.
 const markRead = async (userId, id, throughId, customer = false) => {
     if (!mongoose.isObjectIdOrHexString(id) || !mongoose.isObjectIdOrHexString(throughId)) throw new Error('INVALID_DATA');
     const room = await ChatRoom.findOne({ _id: id, ...(customer ? { customer_id: userId } : {}) }).lean();
@@ -180,6 +199,7 @@ const markRead = async (userId, id, throughId, customer = false) => {
     return getSummary(userId, customer);
 };
 
+// Chỉ nhân viên đang phụ trách được kết thúc hội thoại; lịch sử không bị xóa.
 const closeRoom = async (userId, id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const room = await ChatRoom.findOneAndUpdate({ _id: id, status: 'STAFF_ACTIVE', assigned_staff_id: userId }, { $set: { status: 'CLOSED' } }, { new: true });
@@ -187,6 +207,26 @@ const closeRoom = async (userId, id) => {
     notifyChatChanged(room);
 };
 
+// Gửi tin theo quyền của nhân viên đã tiếp nhận phòng.
 const reply = (userId, id, content, files, clientId) => sendMessage(userId, id, content, files, clientId);
+// Gửi tin dưới vai trò khách và tự mở lại hội thoại đã kết thúc khi cần.
 const customerReply = (userId, content, files, clientId) => sendMessage(userId, null, content, files, clientId, true);
-module.exports = { getRooms, getRoom, getCustomerRoom, getSummary, claimRoom, reply, customerReply, markRead, closeRoom };
+
+// Khách chủ động hủy chờ nhân viên. Không giành lại hội thoại đã được người thật tiếp nhận.
+const resumeAi = async (userId, id) => {
+    if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
+    if (!gemini.isEnabled()) throw new Error('AI_UNAVAILABLE');
+    await mongoose.connection.transaction(async (session) => {
+        const room = await ChatRoom.findOne({ _id: id, customer_id: userId }).session(session);
+        if (!room) throw new Error('RESOURCE_NOT_FOUND');
+        if (room.status !== 'AI_ACTIVE' || room.assigned_staff_id) throw new Error('ROOM_TAKEN');
+        if (!room.waiting_for_staff) return;
+        room.waiting_for_staff = false;
+        room.handoff_reason = null;
+        await room.save({ session });
+    });
+    const room = await ChatRoom.findById(id);
+    notifyChatChanged(room);
+    return getCustomerRoom(userId);
+};
+module.exports = { getRooms, getRoom, getCustomerRoom, getSummary, claimRoom, reply, customerReply, markRead, closeRoom, resumeAi };

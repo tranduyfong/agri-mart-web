@@ -145,13 +145,15 @@ test('Tiếp nhận khi AI đang nghĩ không phát phản hồi cũ; khách g�
     assert.equal(await ChatMessage.countDocuments({ room_id: waiting.id, sender_type: 'AI' }), 1);
 });
 
-test('Lỗi Gemini chuyển nhân viên; gửi lại không nhân đôi và hàng đợi đang chờ được khôi phục', async () => {
+test('Lỗi Gemini không khóa chờ nhân viên; gửi lại không nhân đôi và câu mới vẫn tiếp tục được', async () => {
     const first = await customer(), clientId = randomUUID();
     const room = await send(first.token, 'AI_ERROR', clientId);
     await reply(room.id);
     await send(first.token, 'AI_ERROR', clientId);
-    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, true);
+    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, false);
     assert.equal(await ChatMessage.countDocuments({ room_id: room.id, sender_type: 'AI' }), 1);
+    await send(first.token, 'AI_NEW rau cho bữa tối');
+    await waitFor(async () => (await ChatMessage.countDocuments({ room_id: room.id, sender_type: 'AI' })) === 2);
     const second = await customer();
     const pending = await ChatRoom.create({ customer_id: second.user.id, ai_pending: true });
     await ChatMessage.create({ room_id: pending.id, sender_type: 'CUSTOMER', sender_id: second.user.id, content: 'Khôi phục câu hỏi đang chờ' });
@@ -188,4 +190,63 @@ test('Đặt cả nhóm từ AI: kiểm tra kho, không sửa giỏ, một phí 
     assert.equal(await Order.countDocuments({ user_id: second.user.id }), 0);
     await Product.updateOne({ _id: products[0].id }, { $set: { 'variants.0.stocks.0.quantity': 0 } });
     await api(token, '/order/preview', 'POST', { buy_now: items, checkout_key: randomUUID() }, 409);
+});
+
+test('Giữ lời tư vấn gần gũi, ngữ cảnh sức khỏe/ngân sách và không handoff vì ngân sách thấp', async () => {
+    await Product.updateMany({ _id: { $in: products.slice(0, 2).map(item => item._id) } }, { $set: { 'variants.0.stocks.0.quantity': 20 } });
+    await Product.create({ code: 'AI-MEAT', name: 'Thịt heo thử', slug: 'ai-meat', category_id: products[0].category_id,
+        status: 'PUBLISHED', variants: [{ sku: 'AI-MEAT-KG', name: 'Theo kg', unit: 'kg', step_quantity: 0.5, list_price: 120000,
+            stocks: [{ batch_code: 'MEAT', quantity: 20, expiry_date: new Date(Date.now() + 10 * 86400000) }] }] });
+    const { token } = await customer();
+    const room = await send(token, 'AI_WARM rau và thịt cho người tiểu đường, 3 người dưới 50k');
+    const first = await reply(room.id);
+    assert.match(first.content, /Mình hiểu/);
+    assert.match(first.content, /ngân sách/);
+    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, false);
+    await send(token, 'AI_WARM mình tăng ngân sách lên 300k');
+    await waitFor(async () => (await ChatMessage.countDocuments({ room_id: room.id, sender_type: 'AI' })) === 2);
+    const result = (await api(token, '/chat')).messages.at(-1);
+    assert.match(result.content, /tiểu đường/);
+    assert.match(result.content, /hấp hoặc luộc/);
+    assert.equal(result.recommendations.length, 2);
+    assert.ok(result.recommendations.some(item => item.name.includes('Thịt')));
+    assert.ok(result.recommendations.reduce((sum, item) => sum + item.line_total, 0) <= 300000);
+    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, false);
+});
+
+test('Gợi ý vượt ngân sách bị chặn sau một lần sửa, không giả vờ đủ tiền và không khóa chat', async () => {
+    const { token } = await customer();
+    const room = await send(token, 'AI_OVER_BUDGET rau cho 3 người ngân sách 1000đ');
+    const result = await reply(room.id);
+    assert.equal(result.recommendations.length, 0);
+    assert.match(result.content, /ngân sách/);
+    assert.doesNotMatch(result.content, /Bữa này vừa ngân sách/);
+    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, false);
+});
+
+test('Câu mua thực phẩm không bị model khóa chờ nhân viên; phòng cũ kẹt có thể tiếp tục', async () => {
+    const first = await customer();
+    const room = await send(first.token, 'AI_SHOP_HANDOFF tìm thịt cho 3 người dưới 300k');
+    const message = await reply(room.id);
+    assert.doesNotMatch(message.content, /đã chuyển/);
+    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, false);
+    await ChatRoom.updateOne({ _id: room.id }, { $set: { waiting_for_staff: true, handoff_reason: null } });
+    await send(first.token, 'AI_WARM tìm rau và thịt cho 3 người dưới 300k');
+    await waitFor(async () => (await ChatMessage.countDocuments({ room_id: room.id, sender_type: 'AI' })) === 2);
+    assert.equal((await ChatRoom.findById(room.id)).waiting_for_staff, false);
+});
+
+test('Khách tự tiếp tục với AI, không truy cập phòng người khác hoặc giành phòng đã có nhân viên', async () => {
+    const first = await customer(), second = await customer();
+    const room = await send(first.token, 'Tôi muốn gặp nhân viên');
+    await reply(room.id);
+    assert.equal((await ChatRoom.findById(room.id)).handoff_reason, 'CUSTOMER_REQUEST');
+    await api(second.token, '/chat/' + room.id + '/resume-ai', 'POST', {}, 404);
+    const resumed = await api(first.token, '/chat/' + room.id + '/resume-ai', 'POST', {});
+    assert.equal(resumed.waiting_for_staff, false);
+    await send(first.token, 'AI_WARM tìm rau cho bữa tối');
+    await waitFor(async () => (await ChatMessage.countDocuments({ room_id: room.id, sender_type: 'AI' })) === 2);
+    await api(staffToken, '/staff/support/' + room.id + '/claim', 'POST', {});
+    await api(first.token, '/chat/' + room.id + '/resume-ai', 'POST', {}, 409);
+    assert.equal((await ChatRoom.findById(room.id)).status, 'STAFF_ACTIVE');
 });

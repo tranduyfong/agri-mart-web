@@ -1,3 +1,4 @@
+// Form thông tin, ảnh và các quy cách; tồn ban đầu có lô/giá nhập/hạn dùng và STAFF gửi chờ admin duyệt.
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Select, Table, Upload } from 'antd';
@@ -31,6 +32,7 @@ interface Values {
     unit: string;
     list_price: number;
     step_quantity: number;
+    lot_prices?: { batch_code: string; list_price: number }[];
     initial_stock?: {
       quantity: number;
       unit_cost?: number;
@@ -50,6 +52,7 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
     [removed, setRemoved] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  // Kiểm tra ảnh đăng bán và đổi quy cách/ngày/ảnh thành FormData; STAFF được chuyển tới danh sách chờ duyệt.
   const submit = async (values: Values) => {
     const urls = (values.image_urls || '')
       .split(/[\n,]/)
@@ -69,6 +72,7 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
     setBusy(true);
     setError('');
     try {
+      // Mảng quy cách/ngày được chuyển thành JSON trong multipart để đi cùng các file ảnh.
       const data = new FormData();
       for (const key of ['name', 'code', 'category_id', 'status', 'description'] as const)
         data.append(key, values[key] || '');
@@ -110,7 +114,8 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
       disabled={busy}
       initialValues={
         product
-          ? { ...product, variants: product.variants.map((variant) => ({ ...variant, variant_name: variant.name })) }
+          ? { ...product, variants: product.variants.map((variant) => ({ ...variant, variant_name: variant.name,
+              lot_prices: (variant.stock_lots || []).map((lot) => ({ batch_code: lot.batch_code, list_price: lot.list_price })) })) }
           : {
               status: 'DRAFT',
               variants: [{ unit: 'kg', step_quantity: 1, list_price: 0, initial_stock: { quantity: 0 } }],
@@ -174,10 +179,24 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
                         <Form.Item name={[field.name, 'step_quantity']} label="Bước bán *" rules={required}>
                           <InputNumber className="w-full!" min={0.001} precision={3} />
                         </Form.Item>
-                        <Form.Item name={[field.name, 'list_price']} label="Giá niêm yết (đ) *" rules={required}>
+                        <Form.Item name={[field.name, 'list_price']} label="Giá niêm yết mặc định (đ) *" rules={required}>
                           <InputNumber className="w-full!" min={0} precision={0} />
                         </Form.Item>
                       </div>
+                      {!!product?.variants[field.name]?.stock_lots?.length && (
+                        <div className="mb-4 rounded-lg bg-page-gray p-4">
+                          <p className="mb-3 font-medium">Giá bán theo lô · ưu tiên lô gần hết hạn</p>
+                          {(product.variants[field.name].stock_lots || []).map((lot, index) => (
+                            <div key={lot.batch_code} className="grid items-center gap-3 sm:grid-cols-2">
+                              <p className="text-sm">{lot.batch_code} · HSD {dayjs(lot.expiry_date).format('DD/MM/YYYY')}</p>
+                              <Form.Item name={[field.name, 'lot_prices', index, 'batch_code']} hidden><Input /></Form.Item>
+                              <Form.Item name={[field.name, 'lot_prices', index, 'list_price']} label="Giá bán (đ)" rules={required}>
+                                <InputNumber className="w-full!" min={0} precision={0} />
+                              </Form.Item>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {!product && hasPermission('INVENTORY_MANAGE') && (
                         <div className="border-t border-line pt-4">
                           <p className="mb-4 font-medium">Tồn ban đầu và giá nhập</p>
@@ -269,7 +288,6 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
                   ...lot,
                   sku: variant.sku,
                   unit: variant.unit,
-                  list_price: variant.list_price,
                 })),
               )}
               columns={[
@@ -302,7 +320,7 @@ const ProductForm = ({ product, lookups }: { product: ProductDetail | null; look
         )}
         <Panel title="Hình ảnh và mô tả">
           <p className="mb-4 text-sm text-muted">
-            Ảnh đầu tiên là ảnh đại diện. Khi nhập thêm hàng, mỗi lô có hạn sử dụng và giá nhập riêng.
+            Ảnh đầu tiên là ảnh đại diện. Mỗi lô có hạn sử dụng, giá nhập và giá bán riêng; dùng cùng SKU cho cùng quy cách.
           </p>
           {product && (
             <p className="mb-4 text-sm text-muted">

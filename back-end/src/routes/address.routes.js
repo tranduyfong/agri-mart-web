@@ -1,3 +1,5 @@
+// Đường dẫn cho tỉnh/phường xã; nối URL tới controller.
+// Những middleware được khai báo trên route sẽ chạy trước handler theo thứ tự từ trái sang phải.
 const express = require('express');
 const addressController = require('../controllers/address.controllers');
 

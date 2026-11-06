@@ -1,7 +1,9 @@
+// Ô soạn Markdown có thao tác chèn định dạng, liên kết và ảnh vào vị trí con trỏ.
 import { useRef } from 'react';
 import { Button, Space } from 'antd';
 const ContentEditor = ({ value = '', onChange }: { value?: string; onChange?: (value: string) => void }) => {
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Chèn đoạn Markdown vào chỗ đang chọn trong textarea, giữ phần văn bản trước/sau.
   const insert = (before: string, after: string, placeholder: string) => {
     const start = ref.current?.selectionStart ?? value.length;
     const end = ref.current?.selectionEnd ?? start;

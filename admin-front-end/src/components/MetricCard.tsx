@@ -1,3 +1,4 @@
+// Thẻ số liệu quản trị dùng chung để hiển thị doanh thu, đơn hàng hoặc giá vốn.
 import type { ReactNode } from 'react';
 const MetricCard = ({ label, value, hint }: { label: string; value: ReactNode; hint: string }) => (
   <div className="min-w-0 rounded-2xl border border-line bg-white p-6">

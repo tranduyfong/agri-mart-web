@@ -1,3 +1,4 @@
+// Khung dùng chung cho giỏ hàng/yêu thích, xử lý trạng thái tải và thao tác cần đăng nhập.
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -23,6 +24,7 @@ const ShoppingSection = ({ title, kind, children }: ShoppingSectionProps) => {
   const location = useLocation();
   const isEmpty = (kind === 'cart' ? cart : wishlist).length === 0;
 
+  // Đổi giữa giỏ và yêu thích thì đưa vị trí cuộn về đầu trang danh sách.
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [kind]);
 
   return (

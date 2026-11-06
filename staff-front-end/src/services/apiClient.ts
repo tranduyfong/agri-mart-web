@@ -1,3 +1,4 @@
+// Axios dùng chung cho ứng dụng: lấy địa chỉ backend từ cấu hình, gắn token và thống nhất xử lý phiên ở các request.
 import axios from 'axios';
 import { getSavedAccessToken } from '../utils/authStorage';
 
@@ -7,6 +8,7 @@ apiClient.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = 'Bearer ' + token;
   return config;
 });
+// Lỗi 401 phát sự kiện hết phiên để AuthProvider đăng xuất đồng bộ từ mọi màn hình.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

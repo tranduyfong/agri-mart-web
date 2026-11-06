@@ -1,3 +1,4 @@
+// Tải và hiển thị các danh mục trang chủ trong hàng cuộn ngang có nút hai đầu.
 import { Skeleton } from 'antd';
 import HorizontalSection from '../../components/HorizontalSection';
 import CategoryCard from '../../components/CategoryCard';

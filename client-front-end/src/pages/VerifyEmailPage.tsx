@@ -1,3 +1,4 @@
+// Page được router mở cho màn hình này; phần dữ liệu và giao diện chính được giao cho MainLayout.
 import MainLayout from '../containers/layout/MainLayout';
 import AuthSection from '../containers/auth/AuthSection';
 import VerifyEmailForm from '../containers/auth/VerifyEmailForm';

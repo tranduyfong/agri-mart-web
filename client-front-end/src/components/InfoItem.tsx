@@ -1,3 +1,4 @@
+// Hiển thị một biểu tượng cùng nội dung thông tin theo bố cục dùng chung.
 import type { ReactNode } from 'react';
 
 interface InfoItemProps {

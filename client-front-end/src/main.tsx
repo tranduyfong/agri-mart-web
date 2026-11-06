@@ -1,3 +1,4 @@
+// Điểm khởi động React của khách hàng: nạp font/CSS, thiết lập Redux, theme/locale Ant Design và hiệu ứng AOS.
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
@@ -19,10 +20,12 @@ AOS.init({
   duration: 550,
   easing: 'ease-out-cubic',
   once: true,
-  offset: 60,
+  offset: 0,
   disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
 });
 
+// Bọc Provider/ConfigProvider/App trước Router để các màn hình dùng được Redux, giao diện Ant Design và
+// message/modal.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/* Redux: cung cấp store cho toàn bộ ứng dụng */}

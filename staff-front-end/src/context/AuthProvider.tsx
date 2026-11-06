@@ -1,3 +1,5 @@
+// Giữ token/phiên bằng React Context, xác minh lại với API, cung cấp login/logout và kiểm tra quyền cho các trang
+// con.
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AuthContext } from './AuthContext';
@@ -25,10 +27,12 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
   }, []);
 
+  // API báo phiên hết hạn thì đăng xuất; cleanup gỡ listener để không xử lý lặp.
   useEffect(() => {
     window.addEventListener('staff-session-expired', logout);
     return () => window.removeEventListener('staff-session-expired', logout);
   }, [logout]);
+  // Token được khôi phục từ trình duyệt phải được backend kiểm tra phiên/quyền trước khi mở các trang quản lý.
   useEffect(() => {
     if (!token) return;
     let outdated = false;
@@ -47,6 +51,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [token, logout]);
 
+  // Lưu token nhận từ đăng nhập, xác minh phiên qua API rồi mới mở nội dung quản lý.
   const login = async (email: string, password: string) => {
     const data = await staffService.login(email, password);
     saveAccessToken(data.accessToken);

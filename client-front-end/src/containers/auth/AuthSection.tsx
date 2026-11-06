@@ -1,3 +1,4 @@
+// Bố cục ghép form tài khoản và banner, tự đổi cách sắp xếp trên điện thoại.
 import type { ReactNode } from 'react';
 import AuthBanner from './AuthBanner';
 

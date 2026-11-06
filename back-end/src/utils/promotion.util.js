@@ -1,14 +1,15 @@
+// Tính phần tiền đủ điều kiện giảm và phân bổ tiền giảm sao cho tổng khớp, không bị âm.
 const getEligibleAmount = (items, productIds) => {
     return items.reduce((total, item) => {
         if (productIds.length && !productIds.includes(item.product_id.toString())) return total;
-        return total + Math.round(item.price * item.quantity);
+        return total + (item.line_total ?? Math.round(item.price * item.quantity));
     }, 0);
 };
 
 // Tính trên giá đã giảm tự động, không tính phí giao hàng vào đơn tối thiểu.
 const calculateCouponDiscount = (promotion, items, shippingFee, now = new Date()) => {
     if (promotion.valid_from > now || promotion.valid_to < now) throw new Error('COUPON_EXPIRED');
-    const productsTotal = items.reduce((total, item) => total + Math.round(item.price * item.quantity), 0);
+    const productsTotal = items.reduce((total, item) => total + (item.line_total ?? Math.round(item.price * item.quantity)), 0);
     if (productsTotal < promotion.min_order_value) throw new Error('COUPON_MIN_ORDER');
     if (promotion.promotion_scope === 'PRODUCT' && promotion.discount_type === 'PERCENT' && !promotion.requires_code) {
         throw new Error('COUPON_ALREADY_APPLIED');

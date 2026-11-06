@@ -1,3 +1,4 @@
+// Bong bóng chat cố định góc phải; mở/thu nhỏ khung và hiển thị số tin chưa đọc trên mọi trang khách.
 import { useState } from 'react';
 import { Alert, Avatar, Badge, Button, Spin } from 'antd';
 import { CloseOutlined, CommentOutlined, CustomerServiceOutlined, MinusOutlined } from '@ant-design/icons';
@@ -35,10 +36,12 @@ const ChatWindow = ({ token }: { token: string | null }) => {
         {chat.room?.status !== 'STAFF_ACTIVE' && <div className="flex items-center justify-between gap-2 px-4 pb-2">
           <p className="text-[10px] text-gray-400">{chat.room?.waiting_for_staff ? 'Nhân viên sẽ tiếp nhận yêu cầu của bạn.'
             : chat.room?.ai_enabled ? 'AI hỗ trợ tìm sản phẩm còn hàng.' : 'Cửa hàng luôn sẵn sàng hỗ trợ bạn.'}</p>
-          <Button type="link" size="small" disabled={chat.room?.waiting_for_staff} onClick={() => {
+          {chat.room?.waiting_for_staff && chat.room.ai_enabled ? (
+            <Button type="link" size="small" onClick={() => void chat.resumeAi()}>Tiếp tục với AI</Button>
+          ) : <Button type="link" size="small" disabled={chat.room?.waiting_for_staff} onClick={() => {
             const body = new FormData(); body.set('content', 'Tôi muốn gặp nhân viên cửa hàng.'); body.set('client_id', crypto.randomUUID());
             void chat.send(body).catch(() => chat.reload());
-          }}>Gặp nhân viên</Button>
+          }}>Gặp nhân viên</Button>}
         </div>}
         <ChatComposer onSend={chat.send} />
       </>}

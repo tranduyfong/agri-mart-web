@@ -1,3 +1,4 @@
+// Đổi thời gian còn lại thành các ô đếm ngược hiển thị ở chương trình khuyến mãi.
 import useTimeLeft from '../hooks/useTimeLeft';
 
 interface CountdownTimerProps {

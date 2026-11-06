@@ -1,3 +1,4 @@
+// Tải gợi ý tương tự từ backend và hiển thị thành hàng sản phẩm.
 import ProductRow from '../../components/ProductRow';
 import { useEffect, useState } from 'react';
 import productService from '../../services/productService';
@@ -15,6 +16,7 @@ const RelatedProductsSection = ({ productId, categoryId }: RelatedProductsSectio
     id: string;
     products: ProductListItem[];
   } | null>(null);
+  // Đổi sản phẩm gốc thì xin lại gợi ý tương tự; không dùng kết quả của request dành cho sản phẩm trước.
   useEffect(() => {
     let outdated = false;
     productService

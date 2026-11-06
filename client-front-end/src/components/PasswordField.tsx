@@ -1,3 +1,4 @@
+// Ô mật khẩu có nút hiện/ẩn và các quy tắc kiểm tra do form truyền vào.
 import { Form, Input } from 'antd';
 import type { Rule } from 'antd/es/form';
 

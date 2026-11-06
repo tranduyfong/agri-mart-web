@@ -1,3 +1,4 @@
+// Đổi cấu trúc sản phẩm API thành props mà các thẻ sản phẩm trên giao diện đang sử dụng.
 import type { ProductCardItem, ProductDetail } from '../types/product';
 
 // Chuyển dữ liệu chi tiết vừa tải thành dữ liệu hiển thị trên thẻ, không lưu giá / tồn kho cũ

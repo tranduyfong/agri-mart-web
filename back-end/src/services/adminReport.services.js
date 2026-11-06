@@ -1,3 +1,4 @@
+// Tổng hợp doanh thu, giá vốn và nhập/bán/tồn từ đơn hàng, sản phẩm và phiếu nhập của cửa hàng.
 const mongoose = require('mongoose');
 const Category = require('../models/category');
 const User = require('../models/user');
@@ -9,6 +10,7 @@ const { getReportRange, completedAt, getOrderCost } = require('../utils/report.u
 const { getToday, parseDate } = require('../utils/date.util');
 const { normalizeSearch } = require('../utils/string.util');
 
+// Chỉ trả hồ sơ phiên quản trị viên đã đăng nhập.
 const getSession = async (userId) => {
     const user = await User.findById(userId).select('full_name email role');
     if (!user || user.role !== 'ADMIN') throw new Error('RESOURCE_NOT_FOUND');
@@ -17,15 +19,18 @@ const getSession = async (userId) => {
     };
 };
 
+// Chuẩn bị danh mục và các mã quyền cho dropdown/bộ lọc của trang quản trị.
 const getLookups = async (userId) => ({
     ...(await getSession(userId)),
     permissions: STAFF_PERMISSIONS,
     categories: (await Category.find().sort({ name: 1 }).lean()).map((item) => ({ id: item._id.toString(), name: item.name }))
 });
 
+// Lấy các đơn hoàn tất trong kỳ theo ngày Việt Nam, cộng doanh thu/hoàn tiền và đối chiếu giá vốn.
 const getRevenue = async (query) => {
     const range = getReportRange(query);
     const [orders, receipts] = await Promise.all([Order.find().lean(), GoodsReceipt.find().lean()]);
+    // Kỳ doanh thu dựa trên mốc hoàn tất và trạng thái đã thu/hoàn tiền, không chỉ ngày tạo đơn.
     const completed = orders.filter(
         (order) =>
             order.status === 'COMPLETED' &&
@@ -79,6 +84,8 @@ const getRevenue = async (query) => {
             revenue,
             refund_amount: refund,
             order_count: completed.length,
+            // Có dòng thiếu giá vốn thì trả null để giao diện cảnh báo, không hiển thị một con số lợi nhuận tưởng là
+            // đầy đủ.
             cost: missingCost ? null : knownCost,
             known_cost: knownCost,
             gross_profit: missingCost ? null : revenue - refund - knownCost
@@ -89,6 +96,7 @@ const getRevenue = async (query) => {
     };
 };
 
+// Đối chiếu nhập, bán và tồn theo từng SKU/đơn vị; tồn hiển thị là tồn hiện tại.
 const getInventoryReport = async (query, pagination) => {
     const range = getReportRange(query);
     if (query.category_id && (!mongoose.isObjectIdOrHexString(query.category_id) || !(await Category.exists({ _id: query.category_id }))))

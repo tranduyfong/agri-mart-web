@@ -1,3 +1,4 @@
+// Tạo bộ gửi email dùng chung; tài khoản SMTP lấy từ biến môi trường.
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({

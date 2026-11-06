@@ -1,6 +1,8 @@
+// User chứa tài khoản, vai trò/quyền, thông tin xác minh, sổ địa chỉ, giỏ hàng và danh sách yêu thích.
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
+// Địa chỉ nhúng có _id riêng để chọn/sửa; mã và tên tỉnh/xã được giữ cùng phần thôn/đường chi tiết.
 const addressSubSchema = new Schema({
     recipient_name: {
         type: String,
@@ -68,6 +70,7 @@ const userSchema = new Schema({
         trim: true
     },
 
+    // Chỉ lưu mật khẩu đã băm; select:false khiến truy vấn thông thường không tự trả trường này.
     password_hash: {
         type: String,
         required: true,
@@ -90,6 +93,7 @@ const userSchema = new Schema({
         default: null
     },
 
+    // role xác định nhóm tài khoản; permissions là các nhóm chức năng cấp thêm cho STAFF.
     role: {
         type: String,
         enum: ['ADMIN', 'STAFF', 'CUSTOMER'],
@@ -104,6 +108,7 @@ const userSchema = new Schema({
         default: 'PENDING'
     },
 
+    // Mã/thời hạn xác minh email được tách khỏi mã quên mật khẩu để hai luồng không dùng lẫn nhau.
     email_verify_token: {
         type: String,
         default: null,
@@ -187,6 +192,7 @@ const userSchema = new Schema({
     optimisticConcurrency: true
 });
 
+// Chỉ số điện thoại dạng chuỗi mới phải duy nhất; nhiều tài khoản được phép chưa có số điện thoại.
 userSchema.index(
     { phone: 1 },
     {

@@ -1,3 +1,4 @@
+// Dải thông tin liên hệ/giờ mở cửa ở đầu trang khách hàng.
 import { ClockCircleOutlined, EnvironmentOutlined, PhoneOutlined } from '@ant-design/icons';
 import InfoItem from '../../components/InfoItem';
 import { STORE_INFO } from '../../utils/constants';

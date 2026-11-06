@@ -1,3 +1,4 @@
+// Danh sách nhãn/màu/bước tiến độ tương ứng mã trạng thái đơn của backend.
 import type { CheckoutOrder } from '../types/order';
 
 export const ORDER_STATUSES: Record<CheckoutOrder['status'], { label: string; color: string }> = {

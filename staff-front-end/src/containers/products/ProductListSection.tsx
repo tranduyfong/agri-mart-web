@@ -1,3 +1,4 @@
+// Danh sách sản phẩm có tìm kiếm/danh mục/trạng thái và các liên kết thêm/sửa/nhập file.
 import { useCallback, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Input, Select, Table, Alert } from 'antd';

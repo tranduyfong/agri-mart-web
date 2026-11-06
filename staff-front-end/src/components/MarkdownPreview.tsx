@@ -1,3 +1,4 @@
+// Xem trước nội dung Markdown bằng các quy tắc render được cấu hình trong component.
 import MarkdownIt from 'markdown-it';
 const markdown = new MarkdownIt({ html: false, breaks: true });
 const MarkdownPreview = ({ content }: { content: string }) => (

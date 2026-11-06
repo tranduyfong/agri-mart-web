@@ -1,3 +1,4 @@
+// Bước nhập email để nhận OTP khôi phục mật khẩu.
 import { useState } from 'react';
 import { App, Form } from 'antd';
 import AuthFormHeader from '../../components/AuthFormHeader';
@@ -19,6 +20,7 @@ const ForgotPasswordEmailForm = ({ onEmailSent }: ForgotPasswordEmailFormProps) 
   const { message } = App.useApp();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Xin OTP cho email rồi chuyển thông tin email sang bước tiếp theo.
   const handleSubmit = async (values: ForgotPasswordFormValues) => {
     const email = values.email.trim();
 

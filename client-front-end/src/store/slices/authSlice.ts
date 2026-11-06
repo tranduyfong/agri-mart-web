@@ -1,3 +1,4 @@
+// State Redux của phiên khách hàng; tách cập nhật hồ sơ khỏi đổi phiên để không làm mất giỏ/yêu thích.
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUser } from '../../types/auth';

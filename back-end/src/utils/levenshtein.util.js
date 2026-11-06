@@ -1,3 +1,4 @@
+// Đo số phép sửa ký tự để hỗ trợ tìm sản phẩm gõ sai và trả lại từ khóa gợi ý có dấu.
 const { normalizeSearch } = require('./string.util');
 
 // Mỗi lần thêm, xóa hoặc thay một ký tự có chi phí bằng 1.
@@ -5,10 +6,13 @@ const levenshteinDistance = (first, second) => {
     if (first.length > second.length) return levenshteinDistance(second, first);
     let previous = Array.from({ length: first.length + 1 }, (_, index) => index);
 
+    // Quy hoạch động: mỗi ô là số phép sửa ít nhất cho hai đoạn đầu chuỗi.
+    // Chỉ giữ hàng trước và hàng hiện tại để không phải lưu cả bảng hai chiều.
     for (let row = 1; row <= second.length; row++) {
         const current = [row];
         for (let column = 1; column <= first.length; column++) {
             const cost = first[column - 1] === second[row - 1] ? 0 : 1;
+            // Chọn ít tốn nhất giữa thêm, xóa hoặc thay ký tự; ký tự giống nhau thì cost bằng 0.
             current[column] = Math.min(current[column - 1] + 1, previous[column] + 1, previous[column - 1] + cost);
         }
         previous = current;

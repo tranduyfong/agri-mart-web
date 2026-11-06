@@ -1,3 +1,4 @@
+// Đọc lựa chọn từ URL, tải hồ sơ và bản tính tiền; hỗ trợ giỏ hàng hoặc mua ngay một/nhóm sản phẩm.
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -35,6 +36,7 @@ const CheckoutSection = () => {
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
   const requestKey = JSON.stringify([sessionToken, location.search, retry]);
 
+  // URL/phiên thay đổi thì tải lại hồ sơ và preview; kết quả request cũ bị bỏ nếu người dùng đã chuyển lựa chọn.
   useEffect(() => {
     if (!sessionToken || !user) return;
     let outdated = false;
@@ -43,6 +45,7 @@ const CheckoutSection = () => {
     const buyNow = getBuyNowSelection(params);
     const cartItemIds = buyNow ? [] : (params.get('items') || '').split(',').filter(Boolean);
     if (!buyNow && !cartItemIds.length) return;
+    // Giữ checkoutKey trong sessionStorage cho cùng lựa chọn để tải lại trang/bấm gửi lại không tạo thêm đơn.
     const storageKey = 'agrimart.checkout.' + user.id;
     let saved: { items: string; key: string } | null = null;
     try {

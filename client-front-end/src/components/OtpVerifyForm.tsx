@@ -1,3 +1,4 @@
+// Form OTP dùng lại: xác minh mã, gửi lại và đếm thời gian chờ trước lần gửi tiếp theo.
 import { useState } from 'react';
 import { App } from 'antd';
 import AuthFormHeader from './AuthFormHeader';
@@ -29,6 +30,7 @@ const OtpVerifyForm = ({ title, email, submitText, onSubmit, onResend }: OtpVeri
   // Mã vừa được gửi nên phải chờ hết thời gian đếm ngược mới được gửi lại
   const { secondsLeft, restart } = useCountdown(RESEND_OTP_SECONDS);
 
+  // Kiểm tra mã đã nhập đủ và gọi hàm xác minh do màn hình cụ thể truyền vào.
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
@@ -40,6 +42,7 @@ const OtpVerifyForm = ({ title, email, submitText, onSubmit, onResend }: OtpVeri
     }
   };
 
+  // Gửi mã mới rồi khởi động lại thời gian chờ ở giao diện.
   const handleResend = async () => {
     setIsResending(true);
     try {

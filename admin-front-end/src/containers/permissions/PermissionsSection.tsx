@@ -1,3 +1,4 @@
+// Chọn một nhân viên và các nhóm quyền được cấp; gửi cả mốc updated_at để kiểm tra xung đột khi lưu.
 import { useCallback, useState } from 'react';
 import { Alert, App, Button, Empty, Form, Input, Select } from 'antd';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -22,9 +23,11 @@ const PermissionEditor = ({
 }) => {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
+  // Lưu các quyền được chọn rồi báo cho màn hình cha tải lại dữ liệu.
   const submit = async (values: { permissions: string[] }) => {
     setBusy(true);
     try {
+      // expected_updated_at giúp backend nhận ra bản quyền đang sửa đã bị người khác cập nhật trước đó.
       await accountService.savePermissions(account.id, { ...values, expected_updated_at: account.updated_at });
       void message.success('Đã lưu phân quyền. Quyền mới được kiểm tra ở mỗi API.');
       onSaved();

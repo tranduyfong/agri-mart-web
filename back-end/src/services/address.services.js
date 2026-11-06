@@ -1,3 +1,4 @@
+// Lấy tỉnh/phường xã từ API địa chỉ mới và xác nhận các mã/tên địa chỉ trước khi lưu vào tài khoản.
 const API_URL = 'https://provinces.open-api.vn/api/v2';
 
 // API v2 dùng tỉnh/thành phố và phường/xã theo địa giới mới, không qua quận/huyện.
@@ -15,6 +16,7 @@ const getProvinces = async () => {
     }
 };
 
+// Tải các phường/xã thuộc đúng tỉnh đã chọn.
 const getWardsByProvince = async (provinceCode) => {
     if (!/^\d+$/.test(String(provinceCode)) || Number(provinceCode) <= 0) {
         throw new Error('INVALID_ADDRESS_CODE');
@@ -44,6 +46,7 @@ const getWardsByProvince = async (provinceCode) => {
     }
 };
 
+// Đối chiếu mã tỉnh/xã với API để lưu tên đúng, thay vì tin hoàn toàn chuỗi do frontend gửi.
 const resolveAddress = async ({ province_code, ward_code, street_address = '', hamlet = '' }) => {
     const provinces = await getProvinces();
     const province = provinces.find((item) => item.code === Number(province_code));

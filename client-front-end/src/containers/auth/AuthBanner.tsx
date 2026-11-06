@@ -1,3 +1,4 @@
+// Vùng ảnh/trang trí dùng chung cho các màn hình tài khoản khách hàng.
 import bannerImage from '../../assets/images/auth-banner.jpg';
 import { STORE_INFO } from '../../utils/constants';
 

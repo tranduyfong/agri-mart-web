@@ -1,3 +1,4 @@
+// Gắn từng router vào tiền tố /api; đây là nơi nối đường dẫn HTTP với từng nhóm chức năng.
 const express = require('express');
 const authRoutes = require('./auth.routes');
 const productRoutes = require('./product.routes');

@@ -1,3 +1,4 @@
+// Dòng sản phẩm nhỏ gọn, dùng khi cần hiển thị danh sách thay cho thẻ lớn.
 import ProductCard from './ProductCard';
 import ProductCardSkeleton from './ProductCardSkeleton';
 import SectionHeader from './SectionHeader';

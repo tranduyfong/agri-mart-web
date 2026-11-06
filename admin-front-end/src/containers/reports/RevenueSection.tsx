@@ -1,3 +1,4 @@
+// Dùng cho tổng quan/báo cáo doanh thu: lọc kỳ, xem doanh thu/giá vốn/lợi nhuận và xuất CSV.
 import { useCallback, useState } from 'react';
 import { Button, Dropdown, Table } from 'antd';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -13,6 +14,7 @@ import ReportQuality from '../../components/ReportQuality';
 import RevenueChart from '../../components/RevenueChart';
 import { formatPrice } from '../../utils/format';
 import { downloadCsv } from '../../utils/exportCsv';
+// Định dạng tiền, giữ ký hiệu thiếu dữ liệu khi backend chưa tính được giá vốn/lợi nhuận.
 const money = (value: number | null) => (value === null ? 'Chưa đủ dữ liệu' : formatPrice(value));
 const RevenueSection = ({ overview = false }: { overview?: boolean }) => {
   const [params] = useSearchParams();
@@ -27,6 +29,7 @@ const RevenueSection = ({ overview = false }: { overview?: boolean }) => {
   });
   const load = useCallback(() => reportService.getRevenue(range), [range]);
   const { data, error, reload } = useData(load);
+  // Chọn xuất dữ liệu tổng hợp hoặc theo ngày từ báo cáo đã tải.
   const exportReport = (type: string) => {
     if (!data) return;
     if (type === 'daily')

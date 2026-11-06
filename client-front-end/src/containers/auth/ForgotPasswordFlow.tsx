@@ -1,3 +1,4 @@
+// Điều khiển thứ tự ba bước quên mật khẩu: email, xác minh OTP và đặt mật khẩu mới.
 import { useState } from 'react';
 import OtpVerifyForm from '../../components/OtpVerifyForm';
 import AuthSwitchText from '../../components/AuthSwitchText';

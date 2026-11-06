@@ -1,3 +1,4 @@
+// Banner chương trình flash sale với ảnh, nội dung và thời gian còn lại.
 import { Link } from 'react-router-dom';
 import { RightOutlined } from '@ant-design/icons';
 import CountdownTimer from '../../components/CountdownTimer';
@@ -5,17 +6,15 @@ import PromotionBackground from '../../components/PromotionBackground';
 import useActivePromotions from '../../hooks/useActivePromotions';
 import { ROUTES } from '../../utils/constants';
 import { formatPrice } from '../../utils/format';
+import type { Promotion } from '../../types/promotion';
 
-const FlashSaleBanner = () => {
-  const { promotions } = useActivePromotions(true, 1);
-  const flashSale = promotions[0];
-  if (!flashSale) return null;
-
+// Mỗi chương trình có ảnh, nội dung và đồng hồ riêng.
+const FlashSaleCard = ({ flashSale }: { flashSale: Promotion }) => {
   const discount =
     flashSale.discount_type === 'PERCENT' ? `${flashSale.discount_value}%` : formatPrice(flashSale.discount_value);
 
   return (
-    <section className="relative isolate flex min-h-96 items-center justify-center overflow-hidden rounded-2xl px-4 py-12 text-center text-white sm:px-8">
+    <article className="relative isolate flex min-h-96 items-center justify-center overflow-hidden rounded-2xl px-4 py-12 text-center text-white sm:px-8">
       <PromotionBackground imageUrl={flashSale.image_url} />
       <div className="max-w-3xl">
         <p className="text-sm font-semibold tracking-wide uppercase">Flash sale</p>
@@ -33,6 +32,22 @@ const FlashSaleBanner = () => {
           Mua ngay <RightOutlined className="text-xs" />
         </Link>
       </div>
+    </article>
+  );
+};
+
+const FlashSaleBanner = () => {
+  const { promotions } = useActivePromotions(true);
+  if (!promotions.length) return null;
+
+  return (
+    <section
+      aria-label="Các chương trình Flash sale"
+      className="space-y-6"
+    >
+      {promotions.map((promotion) => (
+        <FlashSaleCard key={promotion.id} flashSale={promotion} />
+      ))}
     </section>
   );
 };

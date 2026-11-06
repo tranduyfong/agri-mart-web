@@ -1,3 +1,5 @@
+// Ánh xạ URL tới page và layout; các route con dùng lại bố cục, còn ứng dụng quản lý kiểm tra phiên/quyền trước khi
+// mở trang.
 import { createBrowserRouter, Link } from 'react-router-dom';
 import { Button, Result } from 'antd';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -9,6 +11,7 @@ import PermissionsPage from '../pages/PermissionsPage';
 import RevenueReportPage from '../pages/RevenueReportPage';
 import InventoryReportPage from '../pages/InventoryReportPage';
 import ProductChangesPage from '../pages/ProductChangesPage';
+import SupplierPage from '../pages/SupplierPage';
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   {
@@ -22,6 +25,7 @@ const router = createBrowserRouter([
       { index: true, element: <OverviewPage /> },
       { path: 'product-changes', element: <ProductChangesPage /> },
       { path: 'accounts', element: <AccountPage /> },
+      { path: 'suppliers', element: <SupplierPage /> },
       { path: 'permissions', element: <PermissionsPage /> },
       { path: 'reports/revenue', element: <RevenueReportPage /> },
       { path: 'reports/inventory', element: <InventoryReportPage /> },

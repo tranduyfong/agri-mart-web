@@ -1,3 +1,4 @@
+// Hiển thị sản phẩm đã thích với các hành động mua hàng dùng chung.
 import { Link } from 'react-router-dom';
 import { Button, Empty } from 'antd';
 import { HeartOutlined } from '@ant-design/icons';

@@ -1,3 +1,4 @@
+// Giữ thay đổi của STAFF ở trạng thái chờ; ADMIN duyệt và áp dụng cùng transaction để không ghi dữ liệu dở dang.
 const mongoose = require('mongoose');
 const Product = require('../models/product');
 const ProductChange = require('../models/productChange');
@@ -20,10 +21,13 @@ const productContent = (product) => ({
         name: variant.name,
         unit: variant.unit,
         step_quantity: variant.step_quantity,
-        list_price: variant.list_price
+        list_price: variant.list_price,
+        lot_prices: variant.stocks.map((lot) => ({ batch_code: lot.batch_code,
+            expiry_date: lot.expiry_date, list_price: lot.list_price ?? variant.list_price }))
     }))
 });
 
+// Lưu nội dung đề nghị thêm/sửa và ảnh chụp trước/sau; Product thật chưa bị cập nhật.
 const submitProduct = async (userId, type, data) => {
     const current = type === 'UPDATE' ? await Product.findById(data.id) : null;
     if (type === 'UPDATE' && !current) throw new Error('PRODUCT_NOT_FOUND');
@@ -52,7 +56,9 @@ const submitProduct = async (userId, type, data) => {
     return { request_id: change.id, status: change.status };
 };
 
+// Lưu đề nghị nhập hàng và khóa gửi lại, chưa cộng kho trong lúc chờ quản trị viên.
 const submitImport = async (userId, data) => {
+    if (!data.supplier_id) throw new Error('SUPPLIER_REQUIRED');
     if (data.import_key) {
         const existing = await ProductChange.findOne({ requested_by: userId, request_key: data.import_key });
         if (existing) return { request_id: existing.id, status: existing.status };
@@ -85,6 +91,7 @@ const submitImport = async (userId, data) => {
     }
 };
 
+// Admin xem các yêu cầu; nhân viên chỉ được xem yêu cầu do chính mình gửi.
 const getChanges = async (user, filters, pagination) => {
     const query = user.role === 'ADMIN' ? {} : { requested_by: user.userId };
     if (filters.status) query.status = filters.status;
@@ -103,6 +110,7 @@ const getChanges = async (user, filters, pagination) => {
     return { items, totalElements };
 };
 
+// Đọc chi tiết, đối chiếu quyền người xem và chuẩn bị dữ liệu so sánh cho giao diện.
 const getChange = async (user, id) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     const query = { _id: id };
@@ -127,6 +135,7 @@ const getChange = async (user, id) => {
     return change;
 };
 
+// Kiểm tra yêu cầu còn chờ, quyền người gửi và nội dung hiện tại rồi duyệt/từ chối trong transaction.
 const reviewChange = async (adminId, id, data) => {
     if (!mongoose.isObjectIdOrHexString(id)) throw new Error('RESOURCE_NOT_FOUND');
     if (
@@ -136,6 +145,7 @@ const reviewChange = async (adminId, id, data) => {
         (data.status === 'REJECTED' && !data.note.trim())
     )
         throw new Error('INVALID_DATA');
+    // Quyết định duyệt và thao tác ghi dữ liệu thật cùng thành công hoặc cùng bị hủy.
     await mongoose.connection.transaction(async (session) => {
         const change = await ProductChange.findById(id).session(session);
         if (!change) throw new Error('RESOURCE_NOT_FOUND');
@@ -157,7 +167,12 @@ const reviewChange = async (adminId, id, data) => {
             };
             if (change.type === 'UPDATE') {
                 const current = await Product.findById(change.product_id).session(session);
-                if (!current || JSON.stringify(productContent(current)) !== JSON.stringify(change.before))
+                const content = current ? productContent(current) : null;
+                // Yêu cầu cũ chưa có giá theo lô vẫn được đối chiếu theo các trường đã lưu.
+                for (let index = 0; index < (content?.variants.length || 0); index++) {
+                    if (change.before.variants[index]?.lot_prices === undefined) delete content.variants[index].lot_prices;
+                }
+                if (!content || JSON.stringify(content) !== JSON.stringify(change.before))
                     throw new Error('PRODUCT_CHANGE_STALE');
                 change.result = await productService.updateProduct(payload, session);
             } else if (change.type === 'CREATE') change.result = await productService.createProduct(payload, session);

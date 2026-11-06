@@ -1,3 +1,4 @@
+// Kiểu hồ sơ và địa chỉ đã lưu, được các form tài khoản/checkout dùng chung.
 import type { AuthUser } from './auth';
 
 export interface UserAddress {

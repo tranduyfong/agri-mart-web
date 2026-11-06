@@ -27,7 +27,7 @@ const ChatMessage = require('../src/models/chatMessage');
 const ProductChange = require('../src/models/productChange');
 const orderService = require('../src/services/order.services');
 const { getToday } = require('../src/utils/date.util');
-let database, server, staff, customer, token, customerToken, otherToken, limitedToken, adminToken;
+let database, server, staff, customer, token, customerToken, otherToken, limitedToken, adminToken, supplierId;
 let baseUrl,
     logs = '';
 const uploadedPaths = [];
@@ -95,6 +95,7 @@ before(
         assert.equal(exit, 0, seedLog);
         staff = await User.findOne({ role: 'STAFF' });
         customer = await User.findOne({ role: 'CUSTOMER' });
+        supplierId = (await require('../src/models/supplier').findOne()).id;
         token = sign(staff);
         adminToken = sign(await User.findOne({ role: 'ADMIN' }));
         customerToken = sign(customer);
@@ -227,7 +228,7 @@ test('Nhập kho kiểm tra từng dòng, giao dịch và khóa chống nhập t
     await api(
         '/staff/imports',
         'POST',
-        { rows: [{ ...rows[0], quantity: -1 }], import_key: 'qa-invalid-import-key', source_file: 'test.csv' },
+        { rows: [{ ...rows[0], quantity: -1 }], supplier_id: supplierId, import_key: 'qa-invalid-import-key', source_file: 'test.csv' },
         token,
         400
     );
@@ -247,7 +248,7 @@ test('Nhập kho kiểm tra từng dòng, giao dịch và khóa chống nhập t
         expiry_date: '2099-12-31'
     });
     assert.equal((await api('/staff/imports/preview', 'POST', { rows })).data.error_rows, 0);
-    const body = { rows, import_key: 'qa-success-import-key', source_file: 'test.csv' };
+    const body = { rows, supplier_id: supplierId, import_key: 'qa-success-import-key', source_file: 'test.csv' };
     const firstRequest = (await api('/staff/imports', 'POST', body, token, 202)).data;
     const second = (await api('/staff/imports', 'POST', body, token, 202)).data;
     assert.equal(firstRequest.request_id, second.request_id);
@@ -433,6 +434,15 @@ test('Khuyến mãi và banner xuất hiện theo thời gian, mã giảm phí g
         product_ids: []
     });
     assert.ok((await api('/staff/promotions?scope=SHIPPING')).data.some((item) => item.code === 'QA-SHIP'));
+    // Nhiều chương trình cùng hiệu lực phải được trả đủ ở cả hai loại trên trang chủ.
+    for (const isFlashSale of [true, false]) {
+        const type = isFlashSale ? 'FLASH' : 'REGULAR';
+        const codes = ['QA-MULTI-' + type + '-1', 'QA-MULTI-' + type + '-2'];
+        for (const code of codes) await api('/staff/promotions', 'POST', { ...promo, code, is_flash_sale: isFlashSale });
+        const active = await api('/promotion/active?is_flash_sale=' + isFlashSale + '&pageSize=100');
+        assert.ok(codes.every((code) => active.data.some((item) => item.code === code)));
+        assert.ok(!active.data.some((item) => item.code === 'QA-SALE'));
+    }
     const banner = {
         title: 'QA public banner',
         type: 'HOME_CAROUSEL',
@@ -829,8 +839,9 @@ test('Phiếu nhập qua API cũ cũng chờ duyệt; lỗi khi áp dụng hủy
             '/product/import',
             'POST',
             {
+                supplier_id: supplierId,
                 items: [
-                    { sku: variant.sku, quantity: 2, unit_cost: 10000, batch_code: 'QA-ATOMIC-FIRST', expiry_date: '2099-12-31' },
+                    { sku: variant.sku, quantity: 2, unit_cost: 10000, batch_code: 'QA-ATOMIC-FIRST', expiry_date: '2099-12-31', image_url: 'https://example.invalid/rollback.jpg' },
                     { sku: variant.sku, quantity: 2, unit_cost: 12000, batch_code: 'QA-ATOMIC-CONFLICT', expiry_date: '2099-12-31' }
                 ]
             },
@@ -844,6 +855,7 @@ test('Phiếu nhập qua API cũ cũng chờ duyệt; lỗi khi áp dụng hủy
     const receiptsBefore = await GoodsReceipt.countDocuments();
     await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken, 400);
     const unchanged = await Product.findById(product._id);
+    assert.deepEqual([...unchanged.images], [...product.images]);
     assert.ok(!unchanged.variants[0].stocks.some((lot) => lot.batch_code === 'QA-ATOMIC-FIRST'));
     assert.equal(unchanged.variants[0].stocks.find((lot) => lot.batch_code === 'QA-ATOMIC-CONFLICT').quantity, 5);
     assert.equal(await GoodsReceipt.countDocuments(), receiptsBefore);
@@ -856,5 +868,107 @@ test('Phiếu nhập qua API cũ cũng chờ duyệt; lỗi khi áp dụng hủy
     );
 });
 
+test('Nhập ảnh từ Excel: có link, ô trống và không có cột đều hợp lệ; chỉ lưu ảnh sau khi admin duyệt', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP001' });
+    const originalImages = [...product.images];
+    const sku = product.variants[0].sku;
+    const imageUrl = 'https://example.invalid/excel-photo.jpg?size=500';
+    const newImage = 'https://example.invalid/new-product.jpg';
+    const category = (await api('/staff/lookups')).data.categories[0];
+    const base = { sku, quantity: 2, unit_cost: 10000, expiry_date: '2099-12-31' };
+    const rows = [
+        { ...base, batch_code: 'QA-IMAGE-1', image_url: '  ' + imageUrl + '  ' },
+        { ...base, batch_code: 'QA-IMAGE-2', image_url: '' },
+        { ...base, batch_code: 'QA-IMAGE-3' },
+        { ...base, batch_code: 'QA-IMAGE-4', image_url: imageUrl },
+        { ...base, sku: 'QA-IMAGE-NEW', code: 'QA-IMAGE-NEW', name: 'Sản phẩm có ảnh Excel',
+            variant_name: 'Gói', unit: 'gói', category_slug: category.slug, list_price: 20000,
+            batch_code: 'QA-IMAGE-NEW', image_url: newImage }
+    ];
+    const preview = (await api('/staff/imports/preview', 'POST', { rows })).data;
+    assert.equal(preview.error_rows, 0);
+    assert.equal(preview.rows[0].image_url, imageUrl);
+    assert.equal(preview.rows[1].image_url, null);
+    assert.equal(preview.rows[2].image_url, null);
+    const pending = (await api('/staff/imports', 'POST', { rows, supplier_id: supplierId, import_key: 'qa-excel-image-import', source_file: 'images.xlsx' }, token, 202)).data;
+    assert.deepEqual([...(await Product.findById(product._id)).images], originalImages);
+    assert.equal(await Product.countDocuments({ code: 'QA-IMAGE-NEW' }), 0);
+    const detail = (await api('/admin/product-changes/' + pending.request_id, 'GET', undefined, adminToken)).data;
+    assert.equal(detail.rows[0].image_url, imageUrl);
+    await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken);
+    const saved = await Product.findById(product._id);
+    assert.deepEqual([...saved.images], [...originalImages, imageUrl]);
+    assert.ok(rows.slice(0, 4).every((row) => saved.variants[0].stocks.some((lot) => lot.batch_code === row.batch_code)));
+    const newProduct = await Product.findOne({ code: 'QA-IMAGE-NEW' });
+    assert.deepEqual([...newProduct.images], [newImage]);
+    assert.equal(newProduct.status, 'DRAFT');
+
+    // Một phiếu chỉ có ô ảnh trống không được xóa ảnh đã lưu.
+    await api('/staff/imports', 'POST', { rows: [{ ...base, batch_code: 'QA-IMAGE-EMPTY', image_url: '  ' }],
+        supplier_id: supplierId, import_key: 'qa-excel-empty-image', source_file: 'empty.xlsx' }, adminToken);
+    assert.deepEqual([...(await Product.findById(product._id)).images], [...saved.images]);
+
+    const rejected = (await api('/product/import', 'POST', { supplier_id: supplierId, items: [{ ...base, batch_code: 'QA-IMAGE-REJECT',
+        image_url: 'https://example.invalid/rejected.jpg' }] }, token, 202)).data;
+    await api('/admin/product-changes/' + rejected.request_id + '/review', 'PATCH', { status: 'REJECTED', note: 'Không dùng ảnh này' }, adminToken);
+    assert.deepEqual([...(await Product.findById(product._id)).images], [...saved.images]);
+});
+
+test('Link ảnh sai báo lỗi đúng dòng và bị chặn cả khi gọi API nhập trực tiếp', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP001' });
+    const base = { sku: product.variants[0].sku, quantity: 1, unit_cost: 10000, expiry_date: '2099-12-31' };
+    const rows = ['javascript:alert(1)', 'not a url', 123].map((image_url, index) => ({ ...base, batch_code: 'QA-BAD-IMAGE-' + index, image_url }));
+    const preview = (await api('/staff/imports/preview', 'POST', { rows })).data;
+    assert.equal(preview.error_rows, 3);
+    assert.deepEqual(preview.rows.map((row) => row.row_number), [2, 3, 4]);
+    assert.ok(preview.rows.every((row) => row.errors.some((error) => error.includes('Link ảnh'))));
+    await api('/staff/imports', 'POST', { rows, supplier_id: supplierId, import_key: 'qa-invalid-image-import', source_file: 'bad.xlsx' }, token, 400);
+    await api('/product/import', 'POST', { items: rows }, adminToken, 400);
+    assert.deepEqual([...(await Product.findById(product._id)).images], [...product.images]);
+    assert.ok(!(await Product.findById(product._id)).variants[0].stocks.some((lot) => lot.batch_code.startsWith('QA-BAD-IMAGE-')));
+});
+
+test('Nhập hàng bắt buộc nhà cung cấp; dòng chỉnh sửa được kiểm tra lại và giữ đúng giá, hạn khi duyệt', async () => {
+    const product = await Product.findOne({ code: 'DEMO-SP001' });
+    const row = { sku: product.variants[0].sku, quantity: 2, unit_cost: 10000,
+        list_price: 15000, batch_code: 'QA-EDIT-PREVIEW', expiry_date: '2020-01-01' };
+    const body = { rows: [row], import_key: 'qa-edit-preview-supplier', source_file: 'edit.xlsx' };
+    const requestsBefore = await ProductChange.countDocuments();
+    for (const supplier_id of [undefined, null, '']) {
+        const rejected = await api('/staff/imports', 'POST', { ...body, supplier_id }, token, 400);
+        assert.equal(rejected.code, 'SUPPLIER_REQUIRED');
+    }
+    const legacy = await api('/product/import', 'POST', { items: [row] }, token, 400);
+    assert.equal(legacy.code, 'SUPPLIER_REQUIRED');
+    assert.equal(await ProductChange.countDocuments(), requestsBefore);
+    const bad = (await api('/staff/imports/preview', 'POST', { rows: [row] })).data;
+    assert.equal(bad.error_rows, 1);
+    assert.equal(bad.rows[0].data.expiry_date, '2020-01-01');
+    // Mô phỏng sửa ngay trên màn hình kiểm tra: gửi lại toàn bộ file với dòng đã sửa.
+    const corrected = { ...row, quantity: 3, unit_cost: 11000, list_price: 17000, expiry_date: '2099-12-30' };
+    const preview = (await api('/staff/imports/preview', 'POST', { rows: [corrected] })).data;
+    assert.equal(preview.error_rows, 0);
+    assert.equal(preview.rows[0].data.expiry_date, corrected.expiry_date);
+    assert.equal(preview.rows[0].unit_cost, 11000);
+    assert.equal(preview.rows[0].list_price, 17000);
+    const invalidSupplier = await api('/staff/imports', 'POST', { ...body, rows: [corrected], supplier_id: 'bad-id' }, token, 400);
+    assert.equal(invalidSupplier.code, 'SUPPLIER_NOT_FOUND');
+    const pending = (await api('/staff/imports', 'POST', { ...body, rows: [corrected], supplier_id: supplierId }, token, 202)).data;
+    assert.equal(await GoodsReceipt.countDocuments({ import_key: body.import_key }), 0);
+    assert.ok(!(await Product.findById(product.id)).variants[0].stocks.some((lot) => lot.batch_code === row.batch_code));
+    await api('/admin/product-changes/' + pending.request_id + '/review', 'PATCH', { status: 'APPROVED', note: '' }, adminToken);
+    const receipt = await GoodsReceipt.findOne({ import_key: body.import_key });
+    assert.equal(receipt.supplier_id.toString(), supplierId);
+    assert.equal(receipt.total_amount, 33000);
+    assert.equal(receipt.items[0].quantity, 3);
+    assert.equal(receipt.items[0].unit_cost, 11000);
+    assert.equal(receipt.items[0].expiry_date.toISOString().slice(0, 10), corrected.expiry_date);
+    const lot = (await Product.findById(product.id)).variants[0].stocks.find((item) => item.batch_code === row.batch_code);
+    assert.equal(lot.list_price, 17000);
+});
+
 require('./chat.cases')({ test, assert, api, User, ChatRoom, ChatMessage, makeChatCustomer,
     getTokens: () => ({ token, otherToken, limitedToken }), sign, connectOrders, waitUntil, uploadedPaths, cwd, getBaseUrl: () => baseUrl });
+
+require('./lotPricing.cases')({ test, assert, api, Product, Order, GoodsReceipt, User,
+    getActors: () => ({ token, adminToken, customer, customerToken }), getBaseUrl: () => baseUrl });

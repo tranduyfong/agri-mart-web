@@ -1,3 +1,4 @@
+// Bố cục quản trị với sidebar, thanh thông tin và menu drawer trên điện thoại.
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Button, Drawer } from 'antd';
@@ -11,6 +12,7 @@ const AdminLayout = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const section = NAV_ITEMS.find((item) => item.path !== '/' && pathname.startsWith(item.path)) || NAV_ITEMS[0];
+  // Đổi route thì cập nhật tiêu đề tab, vị trí cuộn và các vùng áp dụng AOS.
   useEffect(() => {
     document.title = section.label + ' · Agri-Mart';
     window.scrollTo({ top: 0 });

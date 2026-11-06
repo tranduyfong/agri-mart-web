@@ -1,3 +1,4 @@
+// Danh sách địa chỉ đã lưu, thêm/sửa/xóa và chọn địa chỉ mặc định cho checkout.
 import { useState } from 'react';
 import { App, Button, Empty, Popconfirm, Tag } from 'antd';
 import { CheckCircleFilled, DeleteOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
@@ -12,6 +13,7 @@ const AddressBookSection = () => {
   const [editor, setEditor] = useState<{ address: UserAddress | null } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Thực hiện thay đổi sổ địa chỉ rồi đồng bộ lại danh sách mà các tab tài khoản đang dùng.
   const changeAddress = async (addressId: string, isRemoving: boolean) => {
     setIsSubmitting(true);
     try {

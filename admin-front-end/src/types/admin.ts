@@ -1,3 +1,4 @@
+// Các kiểu phiên quản trị, tài khoản/quyền và báo cáo doanh thu/nhập tồn do API trả về.
 export interface AdminUser {
   id: string;
   full_name: string;

@@ -1,9 +1,11 @@
+// Bộ đếm giảm mỗi giây; được dùng để giới hạn thời gian bấm gửi lại OTP ở giao diện.
 import { useEffect, useState } from 'react';
 
 // Đếm ngược theo giây, dùng cho nút "Gửi lại mã" (VD: phải chờ 60 giây mới được gửi lại)
 const useCountdown = (initialSeconds: number) => {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
 
+  // Giảm một giây mỗi nhịp và dọn timer khi đổi giá trị hoặc rời component.
   useEffect(() => {
     if (secondsLeft <= 0) return;
 

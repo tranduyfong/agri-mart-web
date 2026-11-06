@@ -1,3 +1,4 @@
+// Giới thiệu lý do chọn cửa hàng, kèm liên kết xem thêm/mua sắm.
 import { Link } from 'react-router-dom';
 import { RightOutlined } from '@ant-design/icons';
 import deliveryImage from '../../assets/images/why-delivery.jpg';
